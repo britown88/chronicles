@@ -1,0 +1,3 @@
+[submodule "chronicles/imgui"]
+	path = chronicles/imgui
+	url = https://github.com/ocornut/imgui.git
