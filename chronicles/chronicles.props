@@ -5,6 +5,7 @@
     <stb>$(SolutionDir)external/stb/</stb>
     <glew>$(SolutionDir)external/glew/</glew>
     <sdl2>$(SolutionDir)external/sdl2/</sdl2>
+    <imgui>$(SolutionDir)imgui/</imgui>
   </PropertyGroup>
   <PropertyGroup />
   <ItemDefinitionGroup>
@@ -23,6 +24,10 @@
     </BuildMacro>
     <BuildMacro Include="sdl2">
       <Value>$(sdl2)</Value>
+      <EnvironmentVariable>true</EnvironmentVariable>
+    </BuildMacro>
+    <BuildMacro Include="imgui">
+      <Value>$(imgui)</Value>
       <EnvironmentVariable>true</EnvironmentVariable>
     </BuildMacro>
   </ItemGroup>
