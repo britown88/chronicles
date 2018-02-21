@@ -137,10 +137,13 @@ xcopy /y "$(sdl2)bin" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="app.cpp" />
     <ClCompile Include="colors.cpp" />
     <ClCompile Include="ega.cpp" />
     <ClCompile Include="imgui_impl_sdl_gl3.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="math.cpp" />
+    <ClCompile Include="symbol.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\chronimgui\chronimgui.vcxproj">
@@ -148,9 +151,11 @@ xcopy /y "$(sdl2)bin" "$(OutDir)"</Command>
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="app.h" />
     <ClInclude Include="defs.h" />
     <ClInclude Include="ega.h" />
     <ClInclude Include="imgui_impl_sdl_gl3.h" />
+    <ClInclude Include="math.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

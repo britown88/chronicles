@@ -15,6 +15,12 @@ typedef uintptr_t uPtr;
 typedef float     f32;
 typedef double    f64;
 
+typedef const char *StringView;
+typedef const char *InternString;
+typedef InternString Symbol;
+
+Symbol intern(StringView str);
+
 #ifndef __cplusplus
 typedef byte      bool;
 #define true 1
