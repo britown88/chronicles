@@ -148,28 +148,44 @@ void appStep(App* app) {
 
 
 // Window
-typedef struct Window Window;
-Int2 windowSize(Window* wnd);
-Int2 windowClientArea(Window* wnd); // windowSize * scaleFactor
-float windowScale(Window* wnd); //set by dpi
+Int2 windowSize(Window* wnd) { return { 0 }; }
+Int2 windowClientArea(Window* wnd) { return { 0 }; }
+float windowScale(Window* wnd) { return 0.0f; }
 
-                                // gui(wnd) is called every frame during the imgui update until it returns false
-                                // do your one-off imgui::begin()s here, use lambda capture for state
-                                // label must be unique or this call is ignored
-void windowAddGUI(Window* wnd, StringView label, std::function<bool(Window*)> const && gui);
+void windowAddGUI(Window* wnd, StringView label, std::function<bool(Window*)> const && gui) {
+
+}
 
 
+struct Texture {
 
-typedef struct Texture Texture;
+};
 
-Texture *textureCreateFromPath(StringView path, TextureConfig const& config);
-Texture *textureCreateCustom(u32 width, u32 height, TextureConfig const& config);
-void textureDestroy(Texture *self);
+Texture *textureCreateFromPath(StringView path, TextureConfig const& config) {
+   return nullptr;
+}
+Texture *textureCreateFromBuffer(byte* buffer, u64 size, TextureConfig const& config) {
+   return nullptr;
+}
+Texture *textureCreateCustom(u32 width, u32 height, TextureConfig const& config) {
+   return nullptr;
+}
+void textureDestroy(Texture *self) {
 
-void textureSetPixels(Texture *self, byte *data);
-Int2 textureGetSize(Texture *t);
+}
+
+void textureSetPixels(Texture *self, byte *data) {
+
+}
+Int2 textureGetSize(Texture *t) {
+   return { 0 };
+}
 
 //because why not
-u32 textureGetHandle(Texture *self);
+u32 textureGetHandle(Texture *self) {
+   return 0;
+}
 
-const ColorRGBA *textureGetPixels(Texture *self);
+const ColorRGBA *textureGetPixels(Texture *self) {
+   return nullptr;
+}

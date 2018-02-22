@@ -57,6 +57,7 @@ typedef struct {
 typedef struct Texture Texture;
 
 Texture *textureCreateFromPath(StringView path, TextureConfig const& config);
+Texture *textureCreateFromBuffer(byte* buffer, u64 size, TextureConfig const& config);
 Texture *textureCreateCustom(u32 width, u32 height, TextureConfig const& config);
 void textureDestroy(Texture *self);
 
