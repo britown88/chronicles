@@ -140,6 +140,7 @@ xcopy /y "$(sdl2)bin" "$(OutDir)"</Command>
     <ClCompile Include="app.cpp" />
     <ClCompile Include="colors.cpp" />
     <ClCompile Include="ega.cpp" />
+    <ClCompile Include="game.cpp" />
     <ClCompile Include="imgui_impl_sdl_gl3.cpp" />
     <ClCompile Include="implementations.cpp" />
     <ClCompile Include="main.cpp" />
@@ -155,6 +156,7 @@ xcopy /y "$(sdl2)bin" "$(OutDir)"</Command>
     <ClInclude Include="app.h" />
     <ClInclude Include="defs.h" />
     <ClInclude Include="ega.h" />
+    <ClInclude Include="game.h" />
     <ClInclude Include="imgui_impl_sdl_gl3.h" />
     <ClInclude Include="math.h" />
   </ItemGroup>
