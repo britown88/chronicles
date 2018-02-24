@@ -18,8 +18,47 @@ bool show_demo_window = true;
 bool show_another_window = false;
 
 
+static void _mainMenu(Game* game, Window* wnd) {
+   if (ImGui::BeginMainMenuBar()) {
+      if (ImGui::BeginMenu("Debug")) {
+
+         if (ImGui::MenuItem("Dialog Stats")) {
+            windowAddGUI(wnd, "DialogStats", [=](Window*wnd) {
+
+               bool p_open = true;
+               if (ImGui::Begin("Dialog Stats", &p_open, ImGuiWindowFlags_AlwaysAutoResize)) {
+                  ImGui::Text("Active Dialogs: %d", DEBUG_windowGetDialogCount(wnd));
+
+                  if (ImGui::Button("Open a test dialog")) {
+                     static int testest = 0;
+                     auto label = format("Dialog Test##%d", testest++);
+
+                     windowAddGUI(wnd, label.c_str(), [=](Window*wnd) {
+                        bool p_open = true;
+                        if (ImGui::Begin(label.c_str(), &p_open, ImGuiWindowFlags_AlwaysAutoResize)) {
+                           ImGui::Text("Hi!");
+                        }
+                        ImGui::End();
+                        return p_open;
+                     });
+                  }
+               }
+               ImGui::End();
+               return p_open;
+            });
+         }
+
+
+         ImGui::EndMenu();
+      }
+
+      ImGui::EndMainMenuBar();
+   }
+}
 
 void gameUpdate(Game* game, Window* wnd) {
+   _mainMenu(game, wnd);
+
    if (!textTexture) {
       textTexture = textureCreateFromPath("goku.png", { RepeatType_CLAMP, FilterType_LINEAR });
    }

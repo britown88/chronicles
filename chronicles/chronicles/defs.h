@@ -1,6 +1,9 @@
 #pragma once
 
 #include <stdint.h>
+#include <string>
+
+
 
 typedef uint8_t   byte;
 typedef int8_t    sbyte;
@@ -20,6 +23,7 @@ typedef const char *InternString;
 typedef InternString Symbol;
 
 Symbol intern(StringView str);
+std::string format(StringView fmt, ...);
 
 #ifndef __cplusplus
 typedef byte      bool;

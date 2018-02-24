@@ -34,7 +34,8 @@ float windowScale(Window* wnd); //set by dpi
 // gui(wnd) is called every frame during the imgui update until it returns false
 // do your one-off imgui::begin()s here, use lambda capture for state
 // label must be unique or this call is ignored
-void windowAddGUI(Window* wnd, StringView label, std::function<bool(Window*)> const && gui);
+void windowAddGUI(Window* wnd, StringView label, std::function<bool(Window*)> gui);
+u64 DEBUG_windowGetDialogCount(Window* wnd);
 
 
 // Rendering
@@ -73,7 +74,7 @@ void textureSetPixels(Texture *self, byte *data);
 Int2 textureGetSize(Texture *t);
 
 //because why not
-u32 textureGetHandle(Texture *self);
+uPtr textureGetHandle(Texture *self);
 
 const ColorRGBA *textureGetPixels(Texture *self);
 

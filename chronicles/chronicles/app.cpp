@@ -10,6 +10,10 @@
 
 #include "math.h"
 
+#include <unordered_map>
+#include <string>
+#include <functional>
+
 struct Window {
    SDL_Window* sdlWnd = nullptr;
    SDL_GLContext sdlCtx = nullptr;
@@ -17,6 +21,13 @@ struct Window {
 
    Int2 size = { 0 }, clientSize = { 0 };
    float scale = 1.0f;
+
+   struct Dialog {
+      std::function<bool(Window*)> dlg;
+      bool bringToFront = true;
+   };
+
+   std::unordered_map<std::string, Dialog> dlgs;
 };
 
 struct App {
@@ -162,10 +173,29 @@ static void _renderFrame(App* app) {
    SDL_GL_SwapWindow(app->wnd->sdlWnd);
 }
 
+static void _updateDialogs(App* app) {
+   std::vector<std::string> deleted;
+   for (auto &dlg : app->wnd->dlgs) {
+
+      if (dlg.second.bringToFront) {
+         ImGui::SetNextWindowFocus();
+         dlg.second.bringToFront = false;
+      }
+
+      if (!dlg.second.dlg(app->wnd)) {
+         deleted.push_back(dlg.first);
+      }
+   }
+   for (auto&d : deleted) {
+      app->wnd->dlgs.erase(d);
+   }
+}
+
 void appStep(App* app) {   
    _pollEvents(app);
    _beginFrame(app);
    _updateGame(app);
+   _updateDialogs(app);
    _renderFrame(app);
 }
 
@@ -181,10 +211,17 @@ void windowRefreshSize(Window* wnd) {
    wnd->scale = wnd->clientSize.x / (float)wnd->size.x;
 }
 
-void windowAddGUI(Window* wnd, StringView label, std::function<bool(Window*)> const && gui) {
+void windowAddGUI(Window* wnd, StringView label, std::function<bool(Window*)> gui) {
+   
+   auto dlg = wnd->dlgs.find(label);
+   if (dlg != wnd->dlgs.end()) {
+      dlg->second.bringToFront = true;
+      return;
+   }
 
+   wnd->dlgs.insert({ label, {gui} });
 }
-
+u64 DEBUG_windowGetDialogCount(Window* wnd) { return wnd->dlgs.size(); }
 
 struct Texture {
    enum {
@@ -367,7 +404,7 @@ Int2 textureGetSize(Texture *t) {
 }
 
 //because why not
-u32 textureGetHandle(Texture *self) {
+uPtr textureGetHandle(Texture *self) {
    if (!self->isLoaded) {
       _textureAcquire(self);
    }

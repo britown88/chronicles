@@ -145,6 +145,7 @@ xcopy /y "$(sdl2)bin" "$(OutDir)"</Command>
     <ClCompile Include="implementations.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="math.cpp" />
+    <ClCompile Include="stringformat.cpp" />
     <ClCompile Include="symbol.cpp" />
   </ItemGroup>
   <ItemGroup>
