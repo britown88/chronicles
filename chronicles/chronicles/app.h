@@ -56,8 +56,15 @@ typedef struct {
 
 typedef struct Texture Texture;
 
+enum {
+   TextureFromBufferFlag_REFERENCE = 0, // do nothing with the input buffer, assume its life outlasts the texture
+   TextureFromBufferFlag_TAKE_OWNERHSIP,// Call free on the buffer on texture destroy
+   TextureFromBufferFlag_COPY           // memcpy out
+};
+typedef byte TextureFromBufferFlag;
+
 Texture *textureCreateFromPath(StringView path, TextureConfig const& config);
-Texture *textureCreateFromBuffer(byte* buffer, u64 size, TextureConfig const& config);
+Texture *textureCreateFromBuffer(byte* buffer, u64 size, TextureConfig const& config, TextureFromBufferFlag flag = 0);
 Texture *textureCreateCustom(u32 width, u32 height, TextureConfig const& config);
 void textureDestroy(Texture *self);
 

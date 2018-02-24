@@ -3,6 +3,7 @@
 #include <SDL2/SDL_syswm.h>
 #include <GL/glew.h> 
 #include <imgui.h>
+#include <stb/stb_image.h>
 
 #include "imgui_impl_sdl_gl3.h"
 
@@ -158,34 +159,204 @@ void windowAddGUI(Window* wnd, StringView label, std::function<bool(Window*)> co
 
 
 struct Texture {
+   enum {
+      SourceType_PATH,
+      SourceType_BUFFER,
+      SourceType_CUSTOM
+   };
+   typedef byte SourceType;
 
+   SourceType srcType = SourceType_PATH;
+   std::string path;
+   byte* buffer = nullptr;
+   u64 bufferSize = 0;
+   TextureFromBufferFlag buffFlag = 0;
+
+   TextureConfig config = { 0 };
+   bool isLoaded = false;
+
+   GLuint glHandle = 0;
+   ColorRGBA *pixels = nullptr;
+   Int2 size = { 0 };
+
+   bool dirty = true;
 };
 
-Texture *textureCreateFromPath(StringView path, TextureConfig const& config) {
-   return nullptr;
+static void _textureRelease(Texture *self) {
+   if (self->isLoaded) {
+      glDeleteTextures(1, &self->glHandle);
+   }
+
+   delete[] self->pixels;
+
+   self->glHandle = -1;
+   self->isLoaded = false;
 }
-Texture *textureCreateFromBuffer(byte* buffer, u64 size, TextureConfig const& config) {
-   return nullptr;
+static void _textureAcquire(Texture *self) {
+
+   byte* data = nullptr;
+
+   switch (self->srcType) {
+   case Texture::SourceType_PATH: {
+      int comps = 0;
+      data = stbi_load(self->path.c_str(), &self->size.x, &self->size.y, &comps, 4);      
+      break; }
+   case Texture::SourceType_BUFFER: {
+      int comps = 0;
+      data = stbi_load_from_memory(self->buffer, (int32_t)self->bufferSize, &self->size.x, &self->size.y, &comps, 4);
+      break; }
+   }
+
+   if (data) {
+      int pixelCount = self->size.x * self->size.y;
+      self->pixels = new ColorRGBA[pixelCount];
+      memcpy(self->pixels, data, pixelCount * sizeof(ColorRGBA));
+
+      stbi_image_free(data);
+   }
+   
+   if (!self->pixels) {
+      return;
+   }
+
+   glEnable(GL_TEXTURE_2D);
+   glGenTextures(1, &self->glHandle);
+   glBindTexture(GL_TEXTURE_2D, self->glHandle);
+   glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+   switch (self->config.filterType) {
+   case FilterType_LINEAR:
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+      break;
+   case FilterType_NEAREST:
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      break;
+   };
+
+   switch (self->config.repeatType) {
+   case RepeatType_REPEAT:
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+      break;
+   case RepeatType_CLAMP:
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+      break;
+   };
+
+   //glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, self->size.x, self->size.y, 0, GL_RGBA, GL_UNSIGNED_BYTE, self->pixels);
+   glBindTexture(GL_TEXTURE_2D, 0);
+
+   self->isLoaded = true;
+}
+
+
+Texture *textureCreateFromPath(StringView path, TextureConfig const& config) {
+   int x = 0, y = 0, comp = 0;
+
+   stbi_info(path, &x, &y, &comp);
+
+   if (x == 0 && y == 0) {
+      return NULL;
+   }
+
+   Texture *out = new Texture();
+   out->config = config;
+   out->srcType = Texture::SourceType_PATH;
+   out->path = path;
+
+   out->size.x = x;
+   out->size.y = y;
+   out->glHandle = -1;
+
+   return out;
+}
+Texture *textureCreateFromBuffer(byte* buffer, u64 size, TextureConfig const& config, TextureFromBufferFlag flag) {
+   int x = 0, y = 0, comp = 0;
+
+   stbi_info_from_memory(buffer, (int32_t)size, &x, &y, &comp);
+   if (x == 0 && y == 0) {
+      return NULL;
+   }
+
+   Texture *out = new Texture();
+   out->config = config;
+   out->srcType = Texture::SourceType_BUFFER;
+   
+   out->bufferSize = size;
+   out->buffFlag = flag;
+
+   if (flag == TextureFromBufferFlag_COPY) {
+      out->buffer = new byte[size];
+      memcpy(out->buffer, buffer, size);
+   }
+   else {
+      out->buffer = buffer;
+   }
+
+   out->size.x = x;
+   out->size.y = y;
+   out->glHandle = -1;
+
+   return out;
 }
 Texture *textureCreateCustom(u32 width, u32 height, TextureConfig const& config) {
-   return nullptr;
+   Texture* out = new Texture();
+
+   out->config = config;
+   out->srcType = Texture::SourceType_CUSTOM;
+
+   out->size.x = width;
+   out->size.y = height;
+
+   out->pixels = new ColorRGBA[width*height];
+   return out;
 }
 void textureDestroy(Texture *self) {
+   if (self->pixels) {
+      _textureRelease(self);
+   }
 
+   if (self->srcType == Texture::SourceType_BUFFER &&
+         (self->buffFlag == TextureFromBufferFlag_TAKE_OWNERHSIP ||
+          self->buffFlag == TextureFromBufferFlag_COPY)) {
+
+      delete[] self->buffer;
+   }
+
+   delete self;
 }
 
 void textureSetPixels(Texture *self, byte *data) {
-
+   memcpy(self->pixels, data, self->size.x * self->size.y * sizeof(ColorRGBA));
+   self->dirty = true;
 }
 Int2 textureGetSize(Texture *t) {
-   return { 0 };
+   return t->size;
 }
 
 //because why not
 u32 textureGetHandle(Texture *self) {
-   return 0;
+   if (!self->isLoaded) {
+      _textureAcquire(self);
+   }
+
+   if (self->dirty) {
+      glBindTexture(GL_TEXTURE_2D, self->glHandle);
+      glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, self->size.x, self->size.y, GL_RGBA, GL_UNSIGNED_BYTE, self->pixels);
+      glBindTexture(GL_TEXTURE_2D, 0);
+      self->dirty = false;
+   }
+
+   return self->glHandle;
 }
 
 const ColorRGBA *textureGetPixels(Texture *self) {
-   return nullptr;
+   if (!self->isLoaded) {
+      _textureAcquire(self);
+   }
+   return self->pixels;
 }
