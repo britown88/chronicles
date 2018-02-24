@@ -7,15 +7,15 @@ typedef struct EGATexture EGATexture;
 
 struct GameData {
    struct {
-      ColorRGBf bgClearColor = { 0.45f, 0.55f, 0.60f }; // clear color behond all imgui windows
-      bool showUI = false; // whether to show the ui or just a fullscreen viewer
+      ColorRGBf bgClearColor = { 0.45f, 0.55f, 0.60f };  // clear color behond all imgui windows
+      bool showUI = false;                               // whether to show the ui or just a fullscreen viewer
    } imgui;
 
    struct {
-      Texture* primaryFrameBuffer = nullptr; // popualted with primaryEgaTexture every frame
-      EGATexture* primaryEGAFrameBuffer = nullptr; //drawn to every game update
+      Texture* texture = nullptr;                        // populated with egaTexture every frame
+      EGATexture* egaTexture = nullptr;                  //drawn to every game update
 
-   } rendering;
+   } primaryView;
 };
 
 typedef struct Game Game;

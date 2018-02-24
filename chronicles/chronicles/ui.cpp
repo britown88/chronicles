@@ -17,7 +17,7 @@ static ImGuiWindowFlags BorderlessFlags =
 static void _doStatsWindow(Window* wnd) {
    auto sz = windowSize(wnd);
 
-   ImGui::SetNextWindowPos(ImVec2(sz.x, ImGui::GetFrameHeightWithSpacing()), ImGuiCond_Always, ImVec2(1, 0));
+   ImGui::SetNextWindowPos(ImVec2((float)sz.x, ImGui::GetFrameHeightWithSpacing()), ImGuiCond_Always, ImVec2(1, 0));
    if (ImGui::Begin("Stats", nullptr, BorderlessFlags | ImGuiWindowFlags_AlwaysAutoResize)) {
       auto txt = format("%.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
       //auto txtSize = ImGui::CalcTextSize(txt.c_str());
@@ -102,8 +102,8 @@ static void _mainMenu(GameData* game, Window* wnd) {
 static Recti _getProportionallyFitRect(Int2 srcSize, Int2 destSize) {
    float rw = (float)destSize.x;
    float rh = (float)destSize.y;
-   float cw = srcSize.x;
-   float ch = srcSize.y;
+   float cw = (float)srcSize.x;
+   float ch = (float)srcSize.y;
 
    float ratio = MIN(rw / cw, rh / ch);
 
@@ -142,15 +142,22 @@ static void _showFullScreenViewer(GameData* game, Window* wnd) {
    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
 
    ImGui::SetNextWindowPos(ImVec2(), ImGuiCond_Always);
-   ImGui::SetNextWindowSize(ImVec2(sz.x, sz.y), ImGuiCond_Always);
+   ImGui::SetNextWindowSize(ImVec2((float)sz.x, (float)sz.y), ImGuiCond_Always);
 
    if (ImGui::Begin("GameWindow", nullptr, BorderlessFlags)) {
-      Int2 sz = { EGA_RES_WIDTH * EGA_PIXEL_WIDTH, EGA_RES_HEIGHT * EGA_PIXEL_HEIGHT };
-      _renderViewerTexture(game->rendering.primaryFrameBuffer, sz);
+      Int2 sz = { (i32)(EGA_RES_WIDTH * EGA_PIXEL_WIDTH), (i32)(EGA_RES_HEIGHT * EGA_PIXEL_HEIGHT) };
+      _renderViewerTexture(game->primaryView.texture, sz);
    }
    ImGui::End();
 
    ImGui::PopStyleVar(3);
+}
+
+static bool _imWindowContextMenu(const char* str_id, int mouse_button) {
+   if (ImGui::IsMouseReleased(mouse_button) && ImGui::IsWindowHovered(ImGuiHoveredFlags_AllowWhenBlockedByPopup)) {
+      ImGui::OpenPopup(str_id);
+   }      
+   return ImGui::BeginPopup(str_id, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings);
 }
 
 static void _showWindowedViewer(GameData* game, Window* wnd) {
@@ -160,15 +167,33 @@ static void _showWindowedViewer(GameData* game, Window* wnd) {
    static Int2 viewersz = { 100,100 };
 
    if (ImGui::Begin("Viewer", nullptr, 0)) {
-      _renderViewerTexture(game->rendering.primaryFrameBuffer, viewersz);
+      _renderViewerTexture(game->primaryView.texture, viewersz);
+
+      if (_imWindowContextMenu("Viewer Context", 1)) {
+         if (ImGui::Selectable("Edit Size")) {
+            windowAddGUI(wnd, "viewerContextResize", [&](Window*wnd) mutable {
+               bool p_open = true;
+               ImGui::OpenPopup("Change Viewer Size");
+               if (ImGui::BeginPopupModal("Change Viewer Size", NULL, ImGuiWindowFlags_AlwaysAutoResize))
+               {
+                  ImGui::DragInt("Width", &viewersz.x);
+                  ImGui::DragInt("Height", &viewersz.y);
+
+                  if (ImGui::Button("OK")) {
+                     ImGui::CloseCurrentPopup();
+                     p_open = false;
+                  }
+                  ImGui::EndPopup();
+               }
+               return p_open;
+            });
+         }
+
+         ImGui::EndPopup();
+      }
    }
    ImGui::End();
 
-   if (ImGui::Begin("Viewer Size", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
-      ImGui::DragInt("Width", &viewersz.x);
-      ImGui::DragInt("Height", &viewersz.y);
-   }
-   ImGui::End();
 }
 
 
