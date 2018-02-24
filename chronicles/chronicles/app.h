@@ -26,6 +26,7 @@ void appDestroy(App* app);
 
 // Window
 typedef struct Window Window;
+void windowRefreshSize(Window* wnd);
 Int2 windowSize(Window* wnd);
 Int2 windowClientArea(Window* wnd); // windowSize * scaleFactor
 float windowScale(Window* wnd); //set by dpi

@@ -33,6 +33,8 @@
 #include "imgui.h"
 #include "imgui_impl_sdl_gl3.h"
 
+#include "app.h"
+
 // SDL,GL3W
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_syswm.h>
@@ -169,7 +171,7 @@ static void ImGui_ImplSdlGL3_SetClipboardText(void*, const char* text)
 // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application.
 // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application.
 // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
-bool ImGui_ImplSdlGL3_ProcessEvent(SDL_Event* event)
+bool ImGui_ImplSdlGL3_ProcessEvent(Window* wnd, SDL_Event* event)
 {
     ImGuiIO& io = ImGui::GetIO();
     switch (event->type)
@@ -206,7 +208,9 @@ bool ImGui_ImplSdlGL3_ProcessEvent(SDL_Event* event)
             io.KeySuper = ((SDL_GetModState() & KMOD_GUI) != 0);
             return true;
         }
+
     }
+    
     return false;
 }
 

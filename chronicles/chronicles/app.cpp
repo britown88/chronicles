@@ -8,10 +8,15 @@
 #include "imgui_impl_sdl_gl3.h"
 #include "game.h"
 
+#include "math.h"
+
 struct Window {
    SDL_Window* sdlWnd = nullptr;
    SDL_GLContext sdlCtx = nullptr;
    ImGuiContext* imguiContext = nullptr;
+
+   Int2 size = { 0 }, clientSize = { 0 };
+   float scale = 1.0f;
 };
 
 struct App {
@@ -70,6 +75,8 @@ static Window* _windowCreate(WindowConfig const& info) {
    SDL_GL_SetSwapInterval(1); // Enable vsync
    glewInit();
 
+   
+
    // Setup ImGui binding
    auto imCtx = ImGui::CreateContext();
    ImGuiIO& io = ImGui::GetIO(); (void)io;
@@ -81,6 +88,7 @@ static Window* _windowCreate(WindowConfig const& info) {
    out->sdlCtx = glcontext;
    out->sdlWnd = window;
    out->imguiContext = imCtx;
+   windowRefreshSize(out);
 
    return out;
 }
@@ -95,7 +103,7 @@ void appPollEvents(App* app) {
    SDL_Event event;
    while (SDL_PollEvent(&event))
    {
-      ImGui_ImplSdlGL3_ProcessEvent(&event);
+      ImGui_ImplSdlGL3_ProcessEvent(app->wnd, &event);
 
       switch (event.type)
       {
@@ -116,6 +124,14 @@ void appPollEvents(App* app) {
             break;
          }
          break;  }
+      case SDL_WINDOWEVENT:
+         switch (event.window.event) {
+         case SDL_WINDOWEVENT_EXPOSED:
+         case SDL_WINDOWEVENT_RESIZED:
+            windowRefreshSize(app->wnd);
+            break;
+         }
+         break;
       }
    }
 }
@@ -155,9 +171,15 @@ void appStep(App* app) {
 
 
 // Window
-Int2 windowSize(Window* wnd) { return { 0 }; }
-Int2 windowClientArea(Window* wnd) { return { 0 }; }
-float windowScale(Window* wnd) { return 0.0f; }
+Int2 windowSize(Window* wnd) { return wnd->size; }
+Int2 windowClientArea(Window* wnd) { return wnd->clientSize; }
+float windowScale(Window* wnd) { return wnd->scale; }
+
+void windowRefreshSize(Window* wnd) {
+   SDL_GetWindowSize(wnd->sdlWnd, &wnd->size.x, &wnd->size.y);
+   SDL_GL_GetDrawableSize(wnd->sdlWnd, &wnd->clientSize.x, &wnd->clientSize.y);
+   wnd->scale = wnd->clientSize.x / (float)wnd->size.x;
+}
 
 void windowAddGUI(Window* wnd, StringView label, std::function<bool(Window*)> const && gui) {
 
