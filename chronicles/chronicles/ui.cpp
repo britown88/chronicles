@@ -120,6 +120,7 @@ static void _renderViewerTexture(Texture* texture, Int2 srcSize) {
    }
 
    auto sz = ImGui::GetContentRegionAvail();
+   auto texSz = textureGetSize(texture);
 
    auto rect = _getProportionallyFitRect(srcSize, { (i32)sz.x, (i32)sz.y });
 
@@ -128,8 +129,11 @@ static void _renderViewerTexture(Texture* texture, Int2 srcSize) {
 
    draw_list->AddImage(
       (ImTextureID)textureGetHandle(texture), 
-      ImVec2(p.x + rect.x, p.y + rect.y), 
-      ImVec2(p.x + rect.x + rect.w, p.y + rect.y + rect.h));
+      ImVec2(p.x + rect.x, p.y + rect.y), //a
+      ImVec2(p.x + rect.x + rect.w, p.y + rect.y + rect.h), //b
+      ImVec2(), //uvA
+      ImVec2((float)texSz.x, (float)texSz.y) //uvB
+      );
 }
 
 static void _showFullScreenViewer(GameData* game, Window* wnd) {
@@ -160,6 +164,56 @@ static bool _imWindowContextMenu(const char* str_id, int mouse_button) {
    return ImGui::BeginPopup(str_id, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings);
 }
 
+static void _imPaletteEditor(EGAPalette *pal) {
+
+   ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2());
+   for (int i = 0; i < EGA_PALETTE_COLORS; ++i) {
+      auto pcolor = egaGetColor(pal->colors[i]);
+      
+      ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(pcolor.r, pcolor.g, pcolor.b, 255));
+      ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(pcolor.r, pcolor.g, pcolor.b, 128));
+
+      ImGui::PushID(i);
+      if (ImGui::Button("", ImVec2(20, 20))) {
+         ImGui::OpenPopup("EGAColorPicker");
+      }
+      if (ImGui::BeginPopup("EGAColorPicker")) {
+
+         for (int y = 0; y < 8; ++y) {
+            for (int x = 0; x < 8; ++x) {
+               byte c = y * 8 + x;
+               auto egac = egaGetColor(c);
+
+               ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(egac.r, egac.g, egac.b, 255));
+               ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(egac.r, egac.g, egac.b, 128));
+
+               ImGui::PushID(c);
+               if (ImGui::Button("", ImVec2(20, 20))) {
+                  ImGui::CloseCurrentPopup();
+               }
+               if (ImGui::IsItemHovered()) {
+                  pal->colors[i] = c;
+               }
+
+               ImGui::PopID();
+               ImGui::SameLine();
+
+               ImGui::PopStyleColor(2);
+            }
+            ImGui::NewLine();
+         }
+         ImGui::EndPopup();
+
+      }
+  
+      ImGui::PopID();
+      ImGui::PopStyleColor(2);
+      ImGui::SameLine();
+   }
+   ImGui::NewLine();
+   ImGui::PopStyleVar();
+}
+
 static void _showWindowedViewer(GameData* game, Window* wnd) {
 
    auto sz = windowSize(wnd);
@@ -167,6 +221,9 @@ static void _showWindowedViewer(GameData* game, Window* wnd) {
    static Int2 viewersz = { 100,100 };
 
    if (ImGui::Begin("Viewer", nullptr, 0)) {
+      _imPaletteEditor(&game->primaryView.palette);
+
+
       _renderViewerTexture(game->primaryView.texture, viewersz);
 
       if (_imWindowContextMenu("Viewer Context", 1)) {
@@ -174,8 +231,7 @@ static void _showWindowedViewer(GameData* game, Window* wnd) {
             windowAddGUI(wnd, "viewerContextResize", [&](Window*wnd) mutable {
                bool p_open = true;
                ImGui::OpenPopup("Change Viewer Size");
-               if (ImGui::BeginPopupModal("Change Viewer Size", NULL, ImGuiWindowFlags_AlwaysAutoResize))
-               {
+               if (ImGui::BeginPopupModal("Change Viewer Size", NULL, ImGuiWindowFlags_AlwaysAutoResize))  {
                   ImGui::DragInt("Width", &viewersz.x);
                   ImGui::DragInt("Height", &viewersz.y);
 

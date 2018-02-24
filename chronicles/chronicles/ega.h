@@ -83,17 +83,17 @@ void egaFontFactoryDestroy(EGAFontFactory *self);
 EGAFont *egaFontFactoryGetFont(EGAFontFactory *self, EGAColor bgColor, EGAColor fgColor);
 
 
-void egaClear(EGATexture *target, EGARegion *vp, EGAPColor color);
-void egaRenderTexture(EGATexture *target, EGARegion *vp, int x, int y, EGATexture *tex);
-void egaRenderTexturePartial(EGATexture *target, EGARegion *vp, int x, int y, EGATexture *tex, int texX, int texY, int texWidth, int texHeight);
-void egaRenderPoint(EGATexture *target, EGARegion *vp, int x, int y, EGAPColor color);
-void egaRenderLine(EGATexture *target, EGARegion *vp, int x1, int y1, int x2, int y2, EGAPColor color);
-void egaRenderLineRect(EGATexture *target, EGARegion *vp, int left, int top, int right, int bottom, EGAPColor color);
-void egaRenderRect(EGATexture *target, EGARegion *vp, int left, int top, int right, int bottom, EGAPColor color);
+void egaClear(EGATexture *target, EGAPColor color, EGARegion *vp = nullptr);
+void egaRenderTexture(EGATexture *target, int x, int y, EGATexture *tex, EGARegion *vp = nullptr);
+void egaRenderTexturePartial(EGATexture *target, int x, int y, EGATexture *tex, int texX, int texY, int texWidth, int texHeight, EGARegion *vp = nullptr);
+void egaRenderPoint(EGATexture *target, int x, int y, EGAPColor color, EGARegion *vp = nullptr);
+void egaRenderLine(EGATexture *target, int x1, int y1, int x2, int y2, EGAPColor color, EGARegion *vp = nullptr);
+void egaRenderLineRect(EGATexture *target, int left, int top, int right, int bottom, EGAPColor color, EGARegion *vp = nullptr);
+void egaRenderRect(EGATexture *target, int left, int top, int right, int bottom, EGAPColor color, EGARegion *vp = nullptr);
 
-void egaRenderCircle(EGATexture *target, EGARegion *vp, int x, int y, int radius, EGAPColor color);
-void egaRenderEllipse(EGATexture *target, EGARegion *vp, int xc, int yc, int width, int height, EGAPColor color);
-void egaRenderEllipseQB(EGATexture *target, EGARegion *vp, int xc, int yc, int radius, EGAPColor color, double aspect);
+void egaRenderCircle(EGATexture *target, int x, int y, int radius, EGAPColor color, EGARegion *vp = nullptr);
+void egaRenderEllipse(EGATexture *target, int xc, int yc, int width, int height, EGAPColor color, EGARegion *vp = nullptr);
+void egaRenderEllipseQB(EGATexture *target, int xc, int yc, int radius, EGAPColor color, double aspect, EGARegion *vp = nullptr);
 
 void egaRenderTextSingleChar(EGATexture *target, const char c, int x, int y, EGAFont *font, int spaces);
 void egaRenderText(EGATexture *target, const char *text, int x, int y, EGAFont *font);

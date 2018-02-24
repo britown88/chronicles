@@ -1,6 +1,7 @@
 #pragma once
 
 #include "math.h"
+#include "ega.h"
 
 typedef struct Texture Texture;
 typedef struct EGATexture EGATexture;
@@ -14,6 +15,7 @@ struct GameData {
    struct {
       Texture* texture = nullptr;                        // populated with egaTexture every frame
       EGATexture* egaTexture = nullptr;                  //drawn to every game update
+      EGAPalette palette;
 
    } primaryView;
 };
