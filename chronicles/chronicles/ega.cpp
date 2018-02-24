@@ -1,4 +1,5 @@
 #include "ega.h"
+#include "app.h"
 
 #include <string.h>
 
@@ -87,7 +88,7 @@ static void _freeTextureBuffers(EGATexture *self) {
    }
 
    if (self->decoded) {
-      //textureDestroy(self->decoded);
+      textureDestroy(self->decoded);
       self->decoded = nullptr;
    }
 
@@ -125,7 +126,7 @@ EGATexture *egaTextureEncode(Texture *source, EGAPalette *targetPalette, EGAPale
 }
 Texture *egaTextureDecode(EGATexture *self, EGAPalette *palette) {
    if (!self->decoded) {
-      //self->decoded = textureCreateCustom(self->w, self->h, RepeatType_Clamp, FilterType_Linear);
+      self->decoded = textureCreateCustom(self->w, self->h, { RepeatType_CLAMP, FilterType_LINEAR });
    }
 
    if (!self->decodePixels) {
@@ -153,7 +154,7 @@ Texture *egaTextureDecode(EGATexture *self, EGAPalette *palette) {
          dsl += self->w; //decode pixel position
       }
 
-      //textureSetPixels(self->decoded, (byte*)self->decodePixels);
+      textureSetPixels(self->decoded, (byte*)self->decodePixels);
       self->decodeDirty = false;
    }
 

@@ -147,6 +147,7 @@ xcopy /y "$(sdl2)bin" "$(OutDir)"</Command>
     <ClCompile Include="math.cpp" />
     <ClCompile Include="stringformat.cpp" />
     <ClCompile Include="symbol.cpp" />
+    <ClCompile Include="ui.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\chronimgui\chronimgui.vcxproj">
