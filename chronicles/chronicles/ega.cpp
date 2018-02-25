@@ -2,6 +2,9 @@
 #include "app.h"
 
 #include <string.h>
+#include <list>
+#include <vector>
+#include <algorithm>
 
 byte getBit(byte dest, byte pos/*0-7*/) {
    return !!(dest & (1 << (pos & 7)));
@@ -122,8 +125,325 @@ void egaTextureDestroy(EGATexture *self) {
    delete self;
 }
 
+struct PaletteColor;
+
+struct PaletteEntry {
+   PaletteEntry *next, *prev;
+   float distance;
+   PaletteColor* color;
+};
+
+typedef PaletteEntry* pPaletteEntry;
+
+struct PaletteColor {
+   byte removable;
+   byte pPos;
+   byte EGAColor;
+   float distance;
+   PaletteEntry entries[64];
+   PaletteColor() :removable(1) {}
+   PaletteColor(byte c) :EGAColor(c), removable(1) {}
+   PaletteColor(byte c, byte targetPalettPosition) :EGAColor(c), removable(0), pPos(targetPalettPosition) {}
+};
+
+struct ImageColor {
+   pPaletteEntry closestColor;
+   ImageColor() :closestColor(0) {}
+};
+
+float GCRGB(byte component) {
+   static float GCRGBTable[256] = { 0.0f };
+   static int loaded = 0;
+
+   if (!loaded) {
+      int i;
+      for (i = 0; i < 256; ++i) {
+         GCRGBTable[i] = pow(i / 255.0f, 2.2f);
+      }
+      loaded = 1;
+   }
+
+   return GCRGBTable[component];
+}
+
+float colorDistance(ColorRGBA c1, ColorRGBA c2) {
+   float r, g, b;
+   r = GCRGB(c1.r) - GCRGB(c2.r);
+   g = GCRGB(c1.g) - GCRGB(c2.g);
+   b = GCRGB(c1.b) - GCRGB(c2.b);
+
+   return r * r + g * g + b * b;
+}
+
+ColorRGBA EGAColorLookup(byte c) {
+   auto ci = egaGetColor(c);
+   ColorRGBA r = {ci.r, ci.g, ci.b, 255};
+   return r;
+}
+
+void insertSortedPaletteEntry(ImageColor &color, PaletteColor &parent, byte target, byte current, PaletteEntry &out) {
+
+   out.color = &parent;
+   out.distance = sqrt(colorDistance(EGAColorLookup(target), EGAColorLookup(current)));
+
+   auto iter = color.closestColor;
+   if (!iter) {
+      out.next = out.prev = nullptr;
+      color.closestColor = &out;
+   }
+   else {
+      PaletteEntry *prev = nullptr;
+      while (iter && out.distance > iter->distance) {
+         prev = iter;
+         iter = iter->next;
+      }
+
+      if (!prev) {
+         out.prev = nullptr;
+         out.next = color.closestColor;
+         out.next->prev = &out;
+         color.closestColor = &out;
+      }
+      else {
+         out.next = iter;
+         out.prev = prev;
+         if (out.next) {
+            out.next->prev = &out;
+         }
+
+         out.prev->next = &out;
+      }
+   }
+}
+
+bool isClosest(ImageColor &color, PaletteEntry &entry) {
+   return color.closestColor == &entry;
+}
+
+void removeColorEntries(PaletteColor *removedColor, ImageColor *colors) {
+   for (auto& entry : removedColor->entries) {
+      for (auto color = colors; color != colors + 64; ++color) {
+         if (color->closestColor == &entry) {
+            color->closestColor = entry.next;
+         }
+      }
+      if (entry.prev) entry.prev->next = entry.next;
+      if (entry.next) entry.next->prev = entry.prev;
+   }
+}
+
+struct rgbega {
+   int rgb;
+   byte ega;
+   rgbega() {}
+   rgbega(int _rgb, byte _ega) :rgb(_rgb), ega(_ega) {}
+   bool operator<(int other) {
+      return rgb < other;
+   }
+};
+
+byte closestEGA(int rgb) {
+   float lowest = 1000.0;
+   int closest = 0;
+
+   for (byte i = 0; i < 64; ++i) {
+      auto c = EGAColorLookup(i);
+
+      float diff = colorDistance(*(ColorRGBA*)&rgb, c);
+
+      if (diff < lowest) {
+         lowest = diff;
+         closest = i;
+      }
+   }
+
+   return closest;
+}
+
 EGATexture *egaTextureCreateFromTextureEncode(Texture *source, EGAPalette *targetPalette, EGAPalette *resultPalette) {
-   return nullptr;
+   int colorCounts[64];
+
+   auto texSize = textureGetSize(source);
+
+   auto pixelCount = texSize.x * texSize.y;
+   byte* alpha = new byte[pixelCount];
+   byte* pixelMap = new byte[pixelCount];
+   std::vector<int> cArray(pixelCount);
+
+   memset(resultPalette->colors, 0, 16);
+   memset(colorCounts, 0, sizeof(int) * 64);
+   memset(alpha, 0, pixelCount);
+   memset(pixelMap, 0, pixelCount);
+
+   auto texColors = textureGetPixels(source);
+
+   //push every pixel into a vector
+   for (int i = 0; i < texSize.x * texSize.y; ++i) {
+      alpha[i] = texColors[i].a == 255;
+      cArray[i] = *(int*)&texColors[i];
+   }
+
+   //sort and unique
+   std::sort(begin(cArray), end(cArray));
+   cArray.erase(std::unique(cArray.begin(), cArray.end()), cArray.end());
+
+   //map the unique colors to their ega equivalents
+   std::vector<rgbega> colorMap(cArray.size());
+
+   for (unsigned int i = 0; i < cArray.size(); ++i)
+      colorMap[i] = rgbega(cArray[i], closestEGA(cArray[i]));
+
+   //go throuygh the image and log how often each EGA color appears
+   for (int i = 0; i < pixelCount; ++i) {
+      int c = *(int*)&texColors[i];
+
+      if (texColors[i].a != 255) {
+         pixelMap[i] = 0;
+         continue;
+      }
+
+      byte ega = std::lower_bound(begin(colorMap), end(colorMap), c)->ega;
+
+      pixelMap[i] = ega;
+      colorCounts[ega]++;
+   }
+
+
+   auto p = targetPalette->colors;
+
+   byte forced[64];
+   memset(forced, EGA_COLOR_UNUSED, 64);
+
+   byte totalCount = 0;
+   for (int i = 0; i < 16; ++i) {
+      if (p[i] != EGA_COLOR_UNUSED) {
+         if (p[i] != EGA_COLOR_UNDEFINED) {
+            forced[p[i]] = totalCount;
+         }
+
+         ++totalCount;
+      }
+   }
+
+   std::list<PaletteColor> palette;
+   ImageColor colors[64];
+   for (int i = 0; i < 64; ++i)
+   {
+      if (forced[i] != EGA_COLOR_UNUSED) {
+         palette.push_back(PaletteColor(i, forced[i]));
+      }
+      else {
+         palette.push_back(PaletteColor(i));
+      }
+
+      for (int j = 0; j < 64; ++j)
+      {
+         insertSortedPaletteEntry(colors[j], palette.back(), j, i, palette.back().entries[j]);
+      }
+   }
+
+   while (palette.size() > totalCount)
+   {
+      //worst color, worst error...
+      float lowestDistance = FLT_MAX;
+      std::list<PaletteColor>::iterator rarestColor;
+
+      for (auto color = palette.begin(); color != palette.end(); ++color) //do this with iterators to erase.
+      {
+         float distance = 0.0f;
+         for (auto& entry : color->entries)
+         {
+            if (isClosest(colors[color->EGAColor], entry))
+            {
+               distance += colorCounts[color->EGAColor] * (entry.next->distance - entry.distance);
+            }
+         }
+         if (distance < lowestDistance && color->removable)
+         {
+            lowestDistance = distance;
+            rarestColor = color;
+         }
+      }
+
+      //remove rarest color, and all of its palette entries in the colors array....
+      removeColorEntries(&*rarestColor, colors);
+      palette.erase(rarestColor);
+   }
+
+   //eliminate unused colors
+   for (auto color = palette.begin(); color != palette.end();) {
+      if (color->removable) {
+         color->distance = 0.0f;
+
+         for (auto& entry : color->entries) {
+            if (isClosest(colors[color->EGAColor], entry)) {
+               color->distance += colorCounts[color->EGAColor] * (entry.next->distance - entry.distance);
+            }
+         }
+
+         if (color->distance == 0.0f) {
+            //color wasnt used
+            removeColorEntries(&*color, colors);
+            color = palette.erase(color);
+            continue;
+         }
+      }
+      ++color;
+   }
+
+   palette.sort([&](const PaletteColor&r1, const PaletteColor&r2) {return r1.distance > r2.distance; });
+
+
+   //this also gives you the look-up table on output...
+   byte paletteOut[16];
+   memset(paletteOut, EGA_COLOR_UNUSED, 16);
+   int LUTcolor = 0;
+
+   //two passes, first to inster colors who have locked positions in the palette
+   for (auto& color : palette) {
+      if (!color.removable) {
+         paletteOut[color.pPos] = color.EGAColor;
+         color.EGAColor = color.pPos;
+      }
+   }
+
+   //next is to fill in the blanks with the rest
+   for (auto& color : palette)
+   {
+      if (color.removable) {
+         while (paletteOut[LUTcolor] != EGA_COLOR_UNUSED) { LUTcolor += 1; };
+         paletteOut[LUTcolor] = color.EGAColor;
+         color.EGAColor = LUTcolor++;
+      }
+   }
+
+   byte colorLUT[64]; //look-up table from 64 colors down the 16 remaining colors.
+   LUTcolor = 0;
+   for (auto& color : colors){
+      colorLUT[LUTcolor++] = color.closestColor->color->EGAColor;
+   }
+
+   memcpy(resultPalette->colors, paletteOut, 16);
+
+   auto out = egaTextureCreate(texSize.x, texSize.y);
+   egaClearAlpha(out);
+   for (int i = 0; i < pixelCount; ++i) {
+      
+
+      if (texColors[i].a == 255) {
+         EGAColor c = colorLUT[pixelMap[i]];
+
+         auto x = i % texSize.x;
+         auto y = i / texSize.x;
+
+         egaRenderPoint(out, { x, y }, c);
+      }
+   }
+
+   delete[] alpha;
+   delete[] pixelMap;
+
+   return out;
 }
 
 // target must exist and must match ega's size, returns !0 on success
@@ -139,12 +459,14 @@ int egaTextureDecode(EGATexture *self, Texture* target, EGAPalette *palette){
    }
    
    //if (self->dirty&Tex_DECODE_DIRTY) {
-      memset(self->decodePixels, 0, self->pixelCount);
+      memset(self->decodePixels, 0, self->pixelCount * sizeof(ColorRGBA));
       u32 x, y;
       u32 asl = 0, psl = 0, dsl = 0;
       for (y = 0; y < self->h; ++y) {
 
          for (x = 0; x < self->w; ++x) {
+
+
             if (self->alphaChannel[asl + (x >> 3)] & (1 << (x & 7))) {
                byte twoPix = self->pixelData[psl + (x >> 1)];
                EGAPColor pIdx = x & 1 ? twoPix >> 4 : twoPix & 15;
@@ -262,6 +584,10 @@ void egaRenderPoint(EGATexture *target, Int2 pos, EGAPColor color, EGARegion *vp
    pos.y += vp->y;
 
    if (pos.x >= vp->w || pos.y >= vp->h) { return; }
+
+   auto alphaPtr = target->alphaChannel + target->alphaSLWidth * pos.y + (pos.x >> 3);
+   *alphaPtr |= 1 << (pos.x & 7);
+
 
    auto ptr = target->pixelData + target->pixelSLWidth * pos.y + (pos.x >> 1);
    if (pos.x & 1) {

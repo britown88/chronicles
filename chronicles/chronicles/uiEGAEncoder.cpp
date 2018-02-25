@@ -9,8 +9,11 @@
 
 struct EncoderState {
    Texture* pngTex = nullptr;
+   EGATexture *ega = nullptr;
    EGAPalette encPal;
    char palName[64];
+
+   
 };
 
 static std::string _getPng() {
@@ -42,6 +45,24 @@ bool _doUI(Window* wnd, EncoderState &state) {
                textureDestroy(state.pngTex);
                state.pngTex = nullptr;
             }
+
+            if (state.ega) {
+               egaTextureDestroy(state.ega);
+               state.ega = nullptr;
+            }
+         }
+
+         ImGui::SameLine();
+         if (ImGui::Button("Encode!")) {
+            if (state.ega) {
+               egaTextureDestroy(state.ega);
+            }
+
+            EGAPalette resultPal = { 0 };
+            state.ega = egaTextureCreateFromTextureEncode(state.pngTex, &state.encPal, &resultPal);
+            state.encPal = resultPal;
+
+            egaTextureDecode(state.ega, state.pngTex, &state.encPal);
          }
       }
       
@@ -55,6 +76,10 @@ bool _doUI(Window* wnd, EncoderState &state) {
             }
 
             state.pngTex = textureCreateFromPath(png.c_str(), { RepeatType_CLAMP, FilterType_NEAREST });
+            if (state.ega) {
+               egaTextureDestroy(state.ega);
+               state.ega = nullptr;
+            }
          }
       }
 
@@ -64,6 +89,10 @@ bool _doUI(Window* wnd, EncoderState &state) {
 
          ImDrawList* draw_list = ImGui::GetWindowDrawList();
          const ImVec2 p = ImGui::GetCursorScreenPos();
+
+         if (state.ega) {
+            egaTextureDecode(state.ega, state.pngTex, &state.encPal);
+         }
 
          draw_list->AddImage(
             (ImTextureID)textureGetHandle(state.pngTex),
