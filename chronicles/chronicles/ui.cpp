@@ -300,9 +300,7 @@ static void _renderViewerTexture(Texture* texture, Int2 srcSize) {
    draw_list->AddImage(
       (ImTextureID)textureGetHandle(texture), 
       ImVec2(p.x + rect.x, p.y + rect.y), //a
-      ImVec2(p.x + rect.x + rect.w, p.y + rect.y + rect.h), //b
-      ImVec2(), //uvA
-      ImVec2((float)texSz.x, (float)texSz.y) //uvB
+      ImVec2(p.x + rect.x + rect.w, p.y + rect.y + rect.h)
       );
 }
 
