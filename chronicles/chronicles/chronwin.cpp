@@ -49,3 +49,40 @@ std::string cwd() {
    GetCurrentDirectory(MAX_PATH, out);
    return out;
 }
+
+byte *readFullFile(StringView path, u64 *fsize) {
+   byte *string;
+   u64 fsizeBuffer = 0;
+   FILE *f = fopen(path, "rb");
+
+   if (!fsize) {
+      fsize = &fsizeBuffer;
+   }
+
+   if (!f) {
+      return nullptr;
+   }
+
+   fseek(f, 0, SEEK_END);
+   *fsize = ftell(f);
+   fseek(f, 0, SEEK_SET);
+
+   string = new byte[*fsize + 1];
+   fread(string, *fsize, 1, f);
+   fclose(f);
+
+   string[*fsize] = 0;
+
+   return string;
+}
+
+int writeBinaryFile(StringView path, byte* buffer, u64 size) {
+   auto fOut = fopen(path, "wb");
+   if (!fOut) {
+      return 0;
+   }
+
+   fwrite(buffer, sizeof(byte), size, fOut);
+   fclose(fOut);
+   return 1;
+}

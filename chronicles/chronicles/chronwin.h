@@ -3,6 +3,7 @@
 //insert all windows shit here
 
 #include <string>
+#include "defs.h"
 
 struct OpenFileConfig {
    std::string filterNames;
@@ -15,3 +16,6 @@ struct OpenFileConfig {
 std::string openFile(OpenFileConfig const& config);
 
 std::string cwd();
+
+byte *readFullFile(StringView path, u64 *fsize);
+int writeBinaryFile(StringView path, byte* buffer, u64 size);

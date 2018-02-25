@@ -3,8 +3,13 @@
 #include "math.h"
 #include "ega.h"
 
+#include <vector>
+#include <string>
+
 typedef struct Texture Texture;
 typedef struct EGATexture EGATexture;
+
+typedef struct PaletteManager PaletteManager;
 
 struct GameData {
    struct {
@@ -18,7 +23,13 @@ struct GameData {
       EGAPalette palette;
 
    } primaryView;
+
+   struct {
+      PaletteManager *palettes;
+   } assets;
 };
+
+GameData* gameGet();
 
 typedef struct Game Game;
 Game* gameCreate();
@@ -28,6 +39,12 @@ typedef struct Window Window;
 void gameUpdate(Game* game, Window* wnd);
 
 void gameDestroy(Game* game);
+void gameDoUI(Window* wnd);
+
+void paletteSave(PaletteManager* manager, StringView name, EGAPalette *pal);
+void paletteLoad(PaletteManager* manager, StringView name, EGAPalette *pal);
+void paletteDelete(PaletteManager* manager, StringView pal);
+
+std::vector<std::string> paletteList(PaletteManager* manager, StringView search = nullptr);
 
 
-void gameDoUI(GameData* data, Window* wnd);

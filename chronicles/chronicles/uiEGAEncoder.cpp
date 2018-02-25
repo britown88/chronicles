@@ -20,7 +20,8 @@ static std::string _getPng() {
    return openFile(cfg);
 }
 
-bool _doUI(GameData* game, Window* wnd, EncoderState &state) {
+bool _doUI(Window* wnd, EncoderState &state) {
+   auto game = gameGet();
    bool p_open = true;
 
    ImGui::SetNextWindowSize(ImVec2(300, 200), ImGuiCond_Appearing);
@@ -28,6 +29,19 @@ bool _doUI(GameData* game, Window* wnd, EncoderState &state) {
    if (ImGui::Begin("EGA Encoder", &p_open)) {
       auto loadBtn = ImGui::Button(ICON_FA_FOLDER_OPEN);
       if(ImGui::IsItemHovered()) ImGui::SetTooltip("Open PNG");
+
+      if (state.pngTex) {
+         ImGui::SameLine();
+         auto closeBtn = ImGui::Button(ICON_FA_TRASH_ALT);
+         if (ImGui::IsItemHovered()) ImGui::SetTooltip("Close PNG");
+
+         if (closeBtn) {
+            if (state.pngTex) {
+               textureDestroy(state.pngTex);
+               state.pngTex = nullptr;
+            }
+         }
+      }
 
       if (loadBtn) {
          auto png = _getPng();
@@ -60,9 +74,10 @@ bool _doUI(GameData* game, Window* wnd, EncoderState &state) {
    return p_open;
 }
 
-void uiToolStartEGAEncoder(GameData* game, Window* wnd) {
+void uiToolStartEGAEncoder( Window* wnd) {
+   auto game = gameGet();
    EncoderState state;
    windowAddGUI(wnd, "EGA Encoder", [=](Window*wnd) mutable {
-      return _doUI(game, wnd, state);
+      return _doUI(wnd, state);
    });
 }

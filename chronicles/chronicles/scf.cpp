@@ -109,7 +109,10 @@ byte const* scfReadBytes(SCFReader& view, u32* sizeOut) {
    if (*view.typeList != SCFType_BYTES) { return nullptr; }
    auto offset = *(u32*)view.pos;
    scfReaderSkip(view);
-   return (byte*)view.header + view.header->binarySegmentOffset + offset;
+
+   auto bin = (byte*)view.header + view.header->binarySegmentOffset + offset;
+   *sizeOut = *(u32*)bin;
+   return bin + sizeof(u32);
 }
 
 struct SCFBuffer {
@@ -249,6 +252,7 @@ void scfWriteString(SCFWriter* writer, StringView string) {
 void scfWriteBytes(SCFWriter* writer, void const* data, u32 size) {
    u32 offset = writer->binarySegment.size;
 
+   writer->binarySegment.push((byte*)&size, sizeof(size)); //push size value to binary
    writer->binarySegment.push((byte*)data, size); //push to binary segment
 
    auto &tlist = writer->currentTypeList.back();
