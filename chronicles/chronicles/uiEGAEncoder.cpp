@@ -9,6 +9,8 @@
 
 struct EncoderState {
    Texture* pngTex = nullptr;
+   EGAPalette encPal;
+   char palName[64];
 };
 
 static std::string _getPng() {
@@ -42,6 +44,8 @@ bool _doUI(Window* wnd, EncoderState &state) {
             }
          }
       }
+      
+      uiPaletteEditor(wnd, &state.encPal, state.palName, 64, PaletteEditorFlags_ENCODE);
 
       if (loadBtn) {
          auto png = _getPng();
@@ -77,6 +81,10 @@ bool _doUI(Window* wnd, EncoderState &state) {
 void uiToolStartEGAEncoder( Window* wnd) {
    auto game = gameGet();
    EncoderState state;
+
+   strcpy(state.palName, "default");
+   paletteLoad(game->assets.palettes, state.palName, &state.encPal);
+
    windowAddGUI(wnd, "EGA Encoder", [=](Window*wnd) mutable {
       return _doUI(wnd, state);
    });

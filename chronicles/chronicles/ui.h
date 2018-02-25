@@ -7,7 +7,8 @@ typedef struct GameData GameData;
 void uiToolStartEGAEncoder(Window* wnd);
 
 enum PaletteEditorFlags_ {
-   PaletteEditorFlags_POPPED_OUT = (1 << 0) // Dont use, set by popout
+   PaletteEditorFlags_ENCODE = (1 << 0), // adds encode sentinel values to color picker
+   PaletteEditorFlags_POPPED_OUT = (1 << 1)// Dont use, set by popout
 };
 typedef byte PaletteEditorFlags;
 
