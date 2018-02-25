@@ -39,7 +39,7 @@ struct SCFTestState {
 
 struct SCFTestResultState {
    void* data;
-   u64 size;
+   u32 size;
 };
 
 static void _uiDoSCFReader(SCFReader &view) {
