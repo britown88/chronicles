@@ -14,6 +14,9 @@
 #include <string>
 #include <functional>
 
+#include "IconsFontAwesome.h"
+#include "fa_merged.cpp"
+
 struct Window {
    SDL_Window* sdlWnd = nullptr;
    SDL_GLContext sdlCtx = nullptr;
@@ -33,6 +36,7 @@ struct Window {
 struct App {
    bool running = false;
    Window* wnd = nullptr;
+   ImFontAtlas* fontAtlas;
 
    Game* game;   
 };
@@ -54,10 +58,30 @@ void appDestroy(App* app) {
    SDL_Quit();
 
    delete app->wnd;
+   delete app->fontAtlas;
    delete app;
 }
 
-static Window* _windowCreate(WindowConfig const& info) {
+static void _initFontAtlas(App* app) {
+   app->fontAtlas = new ImFontAtlas();
+
+   app->fontAtlas->AddFontDefault();
+   //io.Fonts->AddFontDefault();
+
+   // use this for the windows UI font, but we want package this font so
+   //app->fontAtlas->AddFontFromFileTTF("C:/windows/fonts/segoeui.ttf", 16);
+
+   ImFontConfig config;
+   config.MergeMode = true;
+   //config.PixelSnapH = true;
+   static const ImWchar range_merged[] = { ICON_MIN_FA, ICON_MAX_FA, 0 };
+   app->fontAtlas->AddFontFromMemoryCompressedTTF(
+      fa_merged_compressed_data,
+      fa_merged_compressed_size,
+      13.0f, &config, range_merged);
+}
+
+static Window* _windowCreate(App* app, WindowConfig const& info) {
    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0)
    {
       printf("Error: %s\n", SDL_GetError());
@@ -86,10 +110,10 @@ static Window* _windowCreate(WindowConfig const& info) {
    SDL_GL_SetSwapInterval(1); // Enable vsync
    glewInit();
 
-   
+   _initFontAtlas(app);
 
    // Setup ImGui binding
-   auto imCtx = ImGui::CreateContext();
+   auto imCtx = ImGui::CreateContext(app->fontAtlas);
    ImGuiIO& io = ImGui::GetIO(); (void)io;
    ImGui_ImplSdlGL3_Init(window);
 
@@ -105,7 +129,7 @@ static Window* _windowCreate(WindowConfig const& info) {
 }
 
 void appCreateWindow(App* app, WindowConfig const& info) {
-   app->wnd = _windowCreate(info);
+   app->wnd = _windowCreate(app, info);
    app->running = true;
 }
 

@@ -6,6 +6,7 @@
 #include <SDL2/SDL.h>
 
 #include "scf.h"
+#include "ui.h"
 
 static ImGuiWindowFlags BorderlessFlags =
       ImGuiWindowFlags_NoMove |
@@ -261,6 +262,14 @@ static void _mainMenu(GameData* game, Window* wnd) {
             });
          }
 
+
+         ImGui::EndMenu();
+      }
+
+      if (ImGui::BeginMenu("Tools")) {
+         if (ImGui::MenuItem("EGA Encoder")) {
+            uiToolStartEGAEncoder(game, wnd);
+         }
 
          ImGui::EndMenu();
       }

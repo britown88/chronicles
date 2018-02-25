@@ -138,6 +138,7 @@ xcopy /y "$(sdl2)bin" "$(OutDir)"</Command>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="app.cpp" />
+    <ClCompile Include="chronwin.cpp" />
     <ClCompile Include="colors.cpp" />
     <ClCompile Include="ega.cpp" />
     <ClCompile Include="game.cpp" />
@@ -149,6 +150,7 @@ xcopy /y "$(sdl2)bin" "$(OutDir)"</Command>
     <ClCompile Include="stringformat.cpp" />
     <ClCompile Include="symbol.cpp" />
     <ClCompile Include="ui.cpp" />
+    <ClCompile Include="uiEGAEncoder.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\chronimgui\chronimgui.vcxproj">
@@ -157,12 +159,15 @@ xcopy /y "$(sdl2)bin" "$(OutDir)"</Command>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="app.h" />
+    <ClInclude Include="chronwin.h" />
     <ClInclude Include="defs.h" />
     <ClInclude Include="ega.h" />
     <ClInclude Include="game.h" />
+    <ClInclude Include="IconsFontAwesome.h" />
     <ClInclude Include="imgui_impl_sdl_gl3.h" />
     <ClInclude Include="math.h" />
     <ClInclude Include="scf.h" />
+    <ClInclude Include="ui.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
