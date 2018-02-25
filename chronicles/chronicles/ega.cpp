@@ -272,7 +272,63 @@ void egaRenderPoint(EGATexture *target, Int2 pos, EGAPColor color, EGARegion *vp
    }
 }
 void egaRenderLine(EGATexture *target, Int2 pos1, Int2 pos2, EGAPColor color, EGARegion *vp) {
-   if (!vp) { vp = &target->fullRegion; }
+   int dx = abs(pos2.x - pos1.x);
+   int dy = abs(pos2.y - pos1.y);
+   int x0, x1, y0, y1;
+   float x, y, slope;
+
+   //len=0
+   if (!dx && !dy) {
+      return;
+   }
+
+   if (dx > dy) {
+      if (pos1.x > pos2.x) {//flip
+         x0 = pos2.x; y0 = pos2.y;
+         x1 = pos1.x; y1 = pos1.y;
+      }
+      else {
+         x0 = pos1.x; y0 = pos1.y;
+         x1 = pos2.x; y1 = pos2.y;
+      }
+
+      x = x0;
+      y = y0;
+      slope = (float)(y1 - y0) / (float)(x1 - x0);
+
+      while (x < x1) {
+         egaRenderPoint(target, {(i32) x, (i32) y }, color, vp);
+
+         x += 1.0f;
+         y += slope;
+      }
+
+      egaRenderPoint(target, { (i32)x1, (i32)y1 }, color, vp);
+   }
+   else {
+      if (_y0 > _y1) {//flip
+         x0 = pos2.x; y0 = pos2.y;
+         x1 = pos1.x; y1 = pos1.y;
+      }
+      else {
+         x0 = pos1.x; y0 = pos1.y;
+         x1 = pos2.x; y1 = pos2.y;
+      }
+
+      x = x0;
+      y = y0;
+      slope = (float)(x1 - x0) / (float)(y1 - y);
+
+      while (y < y1) {
+
+         egaRenderPoint(target, { (i32)x, (i32)y }, color, vp);
+
+         y += 1.0f;
+         x += slope;
+      }
+
+      egaRenderPoint(target, { (i32)x1, (i32)y1 }, color, vp);
+   }
 }
 void egaRenderLineRect(EGATexture *target, Recti r, EGAPColor color, EGARegion *vp) {
    if (!vp) { vp = &target->fullRegion; }
