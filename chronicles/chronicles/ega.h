@@ -1,6 +1,7 @@
 #pragma once
 
 #include "defs.h"
+#include "math.h"
 
 // These constants are EGA-Hardware limits depending on render mode
 // They're mostly here for reference but most things won't be hardcoded with it
@@ -42,8 +43,10 @@ void egaTextureDestroy(EGATexture *self);
 
 // encoding and decoding from an rgb texture
 typedef struct Texture Texture;
-EGATexture *egaTextureEncode(Texture *source, EGAPalette *targetPalette, EGAPalette *resultPalette);
-Texture *egaTextureDecode(EGATexture *self, EGAPalette *palette);
+EGATexture *egaTextureCreateFromTextureEncode(Texture *source, EGAPalette *targetPalette, EGAPalette *resultPalette);
+
+// target must exist and must match ega's size, returns !0 on success
+int egaTextureDecode(EGATexture *self, Texture* target, EGAPalette *palette);
 
 // binary serialization
 int egaTextureSerialize(EGATexture *self, byte **outBuff, u64 *size);
@@ -55,10 +58,8 @@ u32 egaTextureGetHeight(EGATexture *self);
 void egaTextureResize(EGATexture *self, u32 width, u32 height);
 
 // EGARegions are passed to all draw calls
-// The define an origin and clipping rect for the draw
-typedef struct EGARegion {
-   u32 origin_x, origin_y, width, height;
-}EGARegion;
+// They define an origin and clipping rect for the draw
+typedef Recti EGARegion;
 
 // useful in certian circumstances, dont use this for normal calls
 // passing NULL to a render call will use this for the target automatically
@@ -84,17 +85,18 @@ EGAFont *egaFontFactoryGetFont(EGAFontFactory *self, EGAColor bgColor, EGAColor 
 
 
 void egaClear(EGATexture *target, EGAPColor color, EGARegion *vp = nullptr);
-void egaRenderTexture(EGATexture *target, int x, int y, EGATexture *tex, EGARegion *vp = nullptr);
-void egaRenderTexturePartial(EGATexture *target, int x, int y, EGATexture *tex, int texX, int texY, int texWidth, int texHeight, EGARegion *vp = nullptr);
-void egaRenderPoint(EGATexture *target, int x, int y, EGAPColor color, EGARegion *vp = nullptr);
-void egaRenderLine(EGATexture *target, int x1, int y1, int x2, int y2, EGAPColor color, EGARegion *vp = nullptr);
-void egaRenderLineRect(EGATexture *target, int left, int top, int right, int bottom, EGAPColor color, EGARegion *vp = nullptr);
-void egaRenderRect(EGATexture *target, int left, int top, int right, int bottom, EGAPColor color, EGARegion *vp = nullptr);
+void egaClearAlpha(EGATexture *target);
+void egaRenderTexture(EGATexture *target, Int2 pos, EGATexture *tex, EGARegion *vp = nullptr);
+void egaRenderTexturePartial(EGATexture *target, Int2 pos, EGATexture *tex, Recti uv, EGARegion *vp = nullptr);
+void egaRenderPoint(EGATexture *target, Int2 pos, EGAPColor color, EGARegion *vp = nullptr);
+void egaRenderLine(EGATexture *target, Int2 pos1, Int2 pos2, EGAPColor color, EGARegion *vp = nullptr);
+void egaRenderLineRect(EGATexture *target, Recti r, EGAPColor color, EGARegion *vp = nullptr);
+void egaRenderRect(EGATexture *target, Recti r, EGAPColor color, EGARegion *vp = nullptr);
 
-void egaRenderCircle(EGATexture *target, int x, int y, int radius, EGAPColor color, EGARegion *vp = nullptr);
-void egaRenderEllipse(EGATexture *target, int xc, int yc, int width, int height, EGAPColor color, EGARegion *vp = nullptr);
-void egaRenderEllipseQB(EGATexture *target, int xc, int yc, int radius, EGAPColor color, double aspect, EGARegion *vp = nullptr);
+void egaRenderCircle(EGATexture *target, Int2 pos, int radius, EGAPColor color, EGARegion *vp = nullptr);
+void egaRenderEllipse(EGATexture *target, Recti r, EGAPColor color, EGARegion *vp = nullptr);
+void egaRenderEllipseQB(EGATexture *target, Int2 pos, int radius, double aspect, EGAPColor color, EGARegion *vp = nullptr);
 
-void egaRenderTextSingleChar(EGATexture *target, const char c, int x, int y, EGAFont *font, int spaces);
-void egaRenderText(EGATexture *target, const char *text, int x, int y, EGAFont *font);
-void egaRenderTextWithoutSpaces(EGATexture *target, const char *text, int x, int y, EGAFont *font);
+void egaRenderTextSingleChar(EGATexture *target, const char c, Int2 pos, EGAFont *font, int spaces);
+void egaRenderText(EGATexture *target, const char *text, Int2 pos, EGAFont *font);
+void egaRenderTextWithoutSpaces(EGATexture *target, const char *text, Int2 pos, EGAFont *font);

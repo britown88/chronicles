@@ -71,6 +71,7 @@ static void _uiDoSCFReader(SCFReader &view) {
       else {
          SCFReader subreader = scfReadList(view);
          if (!scfReaderNull(subreader)) {
+            ImGui::PushID(subreader.pos);
             if (ImGui::TreeNode("List")) {
                ImGui::NextColumn(); ImGui::NextColumn();
                _uiDoSCFReader(subreader);
@@ -79,6 +80,7 @@ static void _uiDoSCFReader(SCFReader &view) {
             else {
                ImGui::NextColumn(); ImGui::NextColumn();
             }
+            ImGui::PopID();
             
          }
          else {

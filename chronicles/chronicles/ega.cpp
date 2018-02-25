@@ -61,6 +61,13 @@ so that the scanline can be memcpy'd directly onto the target if its not aligned
 this buffer is generated on-demand with offsetDirty
 */
 
+enum Tex_ {
+   Tex_DECODE_DIRTY = (1 << 0),
+   Tex_OFFSET_DIRTY = (1 << 1),
+   Tex_ALL_DIRTY = (Tex_DECODE_DIRTY | Tex_OFFSET_DIRTY)
+};
+typedef byte TexCleanFlag;
+
 struct EGATexture {
    u32 w = 0, h = 0;
    EGARegion fullRegion = { 0 };
@@ -75,21 +82,15 @@ struct EGATexture {
    byte *pixelData = nullptr;
    byte *pixelDataOffset = nullptr;
 
-   Texture *decoded = nullptr;
    ColorRGBA *decodePixels = nullptr;
 
-   bool offsetDirty = true, decodeDirty = true;
+   TexCleanFlag dirty = Tex_ALL_DIRTY;
 };
 
 static void _freeTextureBuffers(EGATexture *self) {
    if (self->alphaChannel) {
       delete[] self->alphaChannel;
       self->alphaChannel = nullptr;
-   }
-
-   if (self->decoded) {
-      textureDestroy(self->decoded);
-      self->decoded = nullptr;
    }
 
    if (self->decodePixels) {
@@ -121,19 +122,23 @@ void egaTextureDestroy(EGATexture *self) {
    delete self;
 }
 
-EGATexture *egaTextureEncode(Texture *source, EGAPalette *targetPalette, EGAPalette *resultPalette) {
+EGATexture *egaTextureCreateFromTextureEncode(Texture *source, EGAPalette *targetPalette, EGAPalette *resultPalette) {
    return nullptr;
 }
-Texture *egaTextureDecode(EGATexture *self, EGAPalette *palette) {
-   if (!self->decoded) {
-      self->decoded = textureCreateCustom(self->w, self->h, { RepeatType_CLAMP, FilterType_NEAREST });
+
+// target must exist and must match ega's size, returns !0 on success
+int egaTextureDecode(EGATexture *self, Texture* target, EGAPalette *palette){
+
+   auto texSize = textureGetSize(target);
+   if (texSize.x != self->w || texSize.y != self->h) {
+      return 0;
    }
 
    if (!self->decodePixels) {
-      self->decodePixels = new ColorRGBA[self->pixelCount];
+      self->decodePixels = new ColorRGBA[self->w * self->h];
    }
-
-   if (self->decodeDirty) {
+   
+   if (self->dirty&Tex_DECODE_DIRTY) {
       memset(self->decodePixels, 0, self->pixelCount);
       u32 x, y;
       u32 asl = 0, psl = 0, dsl = 0;
@@ -154,11 +159,11 @@ Texture *egaTextureDecode(EGATexture *self, EGAPalette *palette) {
          dsl += self->w; //decode pixel position
       }
 
-      textureSetPixels(self->decoded, (byte*)self->decodePixels);
-      self->decodeDirty = false;
+      self->dirty &= ~Tex_DECODE_DIRTY;
    }
 
-   return self->decoded;
+   textureSetPixels(target, (byte*)self->decodePixels);
+   return 1;
 }
 
 int egaTextureSerialize(EGATexture *self, byte **outBuff, u64 *size) {
@@ -178,7 +183,7 @@ void egaTextureResize(EGATexture *self, u32 width, u32 height) {
    self->w = width;
    self->h = height;
    self->pixelCount = self->w * self->h;
-   self->fullRegion = EGARegion{ 0, 0, self->w, self->h };
+   self->fullRegion = EGARegion{ 0, 0, (i32)self->w, (i32)self->h };
 
    // w/8 + w%8 ? 1 : 0
    self->alphaSLWidth = (self->w >> 3) + ((self->w & 7) ? 1 : 0);
@@ -188,6 +193,8 @@ void egaTextureResize(EGATexture *self, u32 width, u32 height) {
 
    self->alphaChannel = new byte[self->h * self->alphaSLWidth];
    self->pixelData = new byte[self->h * self->pixelSLWidth];
+
+   self->dirty = Tex_ALL_DIRTY;
 }
 
 u32 egaTextureGetWidth(EGATexture *self) { return self->w; }
@@ -231,55 +238,51 @@ void egaClear(EGATexture *target, EGAPColor color, EGARegion *vp) {
          p += target->pixelSLWidth;
       }
 
-      target->decodeDirty = target->offsetDirty = true;
+      target->dirty = Tex_ALL_DIRTY;
    }
    else {
       //region clear is just a rect render on the vp
-      egaRenderRect(target, vp->origin_x, vp->origin_y, vp->origin_x + vp->width, vp->origin_y + vp->height, color);
+      egaRenderRect(target, *vp, color);
    }
 }
+void egaClearAlpha(EGATexture *target) {
 
-void egaRenderTexture(EGATexture *target, int x, int y, EGATexture *tex, EGARegion *vp) {
-   if (!vp) { vp = &target->fullRegion; }
+}
+void egaRenderTexture(EGATexture *target, Int2 pos, EGATexture *tex, EGARegion *vp) {
+
+}
+void egaRenderTexturePartial(EGATexture *target, Int2 pos, EGATexture *tex, Recti uv, EGARegion *vp) {
+
+}
+void egaRenderPoint(EGATexture *target, Int2 pos, EGAPColor color, EGARegion *vp) {
+
+}
+void egaRenderLine(EGATexture *target, Int2 pos1, Int2 pos2, EGAPColor color, EGARegion *vp) {
+
+}
+void egaRenderLineRect(EGATexture *target, Recti r, EGAPColor color, EGARegion *vp) {
+
+}
+void egaRenderRect(EGATexture *target, Recti r, EGAPColor color, EGARegion *vp) {
+
 }
 
-void egaRenderTexturePartial(EGATexture *target, int x, int y, EGATexture *tex, int texX, int texY, int texWidth, int texHeight, EGARegion *vp) {
-   if (!vp) { vp = &target->fullRegion; }
+void egaRenderCircle(EGATexture *target, Int2 pos, int radius, EGAPColor color, EGARegion *vp) {
+
+}
+void egaRenderEllipse(EGATexture *target, Recti r, EGAPColor color, EGARegion *vp) {
+
+}
+void egaRenderEllipseQB(EGATexture *target, Int2 pos, int radius, double aspect, EGAPColor color, EGARegion *vp) {
+
 }
 
-void egaRenderPoint(EGATexture *target, int x, int y, EGAPColor color, EGARegion *vp) {
-   if (!vp) { vp = &target->fullRegion; }
-}
+void egaRenderTextSingleChar(EGATexture *target, const char c, Int2 pos, EGAFont *font, int spaces) {
 
-void egaRenderLine(EGATexture *target, int x1, int y1, int x2, int y2, EGAPColor color, EGARegion *vp) {
-   if (!vp) { vp = &target->fullRegion; }
 }
+void egaRenderText(EGATexture *target, const char *text, Int2 pos, EGAFont *font) {
 
-void egaRenderLineRect(EGATexture *target,int left, int top, int right, int bottom, EGAPColor color, EGARegion *vp) {
-   if (!vp) { vp = &target->fullRegion; }
 }
+void egaRenderTextWithoutSpaces(EGATexture *target, const char *text, Int2 pos, EGAFont *font) {
 
-void egaRenderRect(EGATexture *target, int left, int top, int right, int bottom, EGAPColor color, EGARegion *vp) {
-   if (!vp) { vp = &target->fullRegion; }
-}
-
-void egaRenderCircle(EGATexture *target, int x, int y, int radius, EGAPColor color, EGARegion *vp) {
-   if (!vp) { vp = &target->fullRegion; }
-}
-
-void egaRenderEllipse(EGATexture *target, int xc, int yc, int width, int height, EGAPColor color, EGARegion *vp) {
-   if (!vp) { vp = &target->fullRegion; }
-}
-
-void egaRenderEllipseQB(EGATexture *target, int xc, int yc, int radius, EGAPColor color, double aspect, EGARegion *vp) {
-   if (!vp) { vp = &target->fullRegion; }
-}
-
-void egaRenderTextSingleChar(EGATexture *target, const char c, int x, int y, EGAFont *font, int spaces) { 
-}
-
-void egaRenderText(EGATexture *target, const char *text, int x, int y, EGAFont *font) { 
-}
-
-void egaRenderTextWithoutSpaces(EGATexture *target, const char *text, int x, int y, EGAFont *font) { 
 }
