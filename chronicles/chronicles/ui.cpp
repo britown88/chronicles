@@ -278,20 +278,7 @@ static void _mainMenu(GameData* game, Window* wnd) {
    }
 }
 
-static Recti _getProportionallyFitRect(Int2 srcSize, Int2 destSize) {
-   float rw = (float)destSize.x;
-   float rh = (float)destSize.y;
-   float cw = (float)srcSize.x;
-   float ch = (float)srcSize.y;
 
-   float ratio = MIN(rw / cw, rh / ch);
-
-   Recti out = { 0, 0, (i32)(cw * ratio), (i32)(ch * ratio) };
-   out.x += (i32)((rw - out.w) / 2.0f);
-   out.y += (i32)((rh - out.h) / 2.0f);
-
-   return out;
-}
 
 static void _renderViewerTexture(Texture* texture, Int2 srcSize) {
    if (!texture) {
@@ -301,7 +288,7 @@ static void _renderViewerTexture(Texture* texture, Int2 srcSize) {
    auto sz = ImGui::GetContentRegionAvail();
    auto texSz = textureGetSize(texture);
 
-   auto rect = _getProportionallyFitRect(srcSize, { (i32)sz.x, (i32)sz.y });
+   auto rect = getProportionallyFitRect(srcSize, { (i32)sz.x, (i32)sz.y });
 
    ImDrawList* draw_list = ImGui::GetWindowDrawList();
    const ImVec2 p = ImGui::GetCursorScreenPos();

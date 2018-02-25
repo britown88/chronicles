@@ -49,3 +49,5 @@ static bool rectiIntersects(Recti a, Recti b) {
       b.y >= a.y + a.h) return false;
    return true;
 }
+
+Recti getProportionallyFitRect(Int2 srcSize, Int2 destSize);

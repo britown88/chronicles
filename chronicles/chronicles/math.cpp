@@ -41,3 +41,17 @@ bool lineSegmentIntersectsAABBi(Int2 l1, Int2 l2, Recti *rect) {
    return true;
 
 }
+Recti getProportionallyFitRect(Int2 srcSize, Int2 destSize) {
+   float rw = (float)destSize.x;
+   float rh = (float)destSize.y;
+   float cw = (float)srcSize.x;
+   float ch = (float)srcSize.y;
+
+   float ratio = MIN(rw / cw, rh / ch);
+
+   Recti out = { 0, 0, (i32)(cw * ratio), (i32)(ch * ratio) };
+   out.x += (i32)((rw - out.w) / 2.0f);
+   out.y += (i32)((rh - out.h) / 2.0f);
+
+   return out;
+}
