@@ -145,6 +145,7 @@ xcopy /y "$(sdl2)bin" "$(OutDir)"</Command>
     <ClCompile Include="implementations.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="math.cpp" />
+    <ClCompile Include="scf.cpp" />
     <ClCompile Include="stringformat.cpp" />
     <ClCompile Include="symbol.cpp" />
     <ClCompile Include="ui.cpp" />
@@ -161,6 +162,7 @@ xcopy /y "$(sdl2)bin" "$(OutDir)"</Command>
     <ClInclude Include="game.h" />
     <ClInclude Include="imgui_impl_sdl_gl3.h" />
     <ClInclude Include="math.h" />
+    <ClInclude Include="scf.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

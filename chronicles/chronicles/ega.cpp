@@ -218,11 +218,8 @@ EGAFont *egaFontFactoryGetFont(EGAFontFactory *self, EGAColor bgColor, EGAColor 
 }
 
 void egaClear(EGATexture *target, EGAPColor color, EGARegion *vp) {
-   if (!vp) { vp = &target->fullRegion; }
-
-   if (vp == &target->fullRegion) {
+   if (!vp) {
       //fast clear
-
       byte *a = target->alphaChannel;
       byte *p = target->pixelData;
       for (u32 i = 0; i < target->h; ++i) {
@@ -235,6 +232,10 @@ void egaClear(EGATexture *target, EGAPColor color, EGARegion *vp) {
       }
 
       target->decodeDirty = target->offsetDirty = true;
+   }
+   else {
+      //region clear is just a rect render on the vp
+      egaRenderRect(target, vp->origin_x, vp->origin_y, vp->origin_x + vp->width, vp->origin_y + vp->height, color);
    }
 }
 

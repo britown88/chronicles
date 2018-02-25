@@ -5,6 +5,8 @@
 #include <imgui.h>
 #include <SDL2/SDL.h>
 
+#include "scf.h"
+
 static ImGuiWindowFlags BorderlessFlags =
       ImGuiWindowFlags_NoMove |
       ImGuiWindowFlags_NoCollapse |
@@ -27,6 +29,165 @@ static void _doStatsWindow(Window* wnd) {
    }
    ImGui::End();
 }
+
+struct SCFTestState {
+   SCFWriter *writer = nullptr;
+   char stringBuff[256] = { 0 };
+   int i = 0;
+   float f = 0.0;
+};
+
+struct SCFTestResultState {
+   void* data;
+   u64 size;
+};
+
+static void _uiDoSCFReader(SCFReader &view) {
+   while (!scfReaderNull(view) && !scfReaderAtEnd(view)) {
+      if (auto i = scfReadInt(view)) {
+         ImGui::PushID(i);
+         ImGui::Text("Int");
+         ImGui::NextColumn();
+         ImGui::Text("%d", *i);
+         ImGui::NextColumn();
+         ImGui::PopID();
+      }
+      else if (auto f = scfReadFloat(view)) {
+         ImGui::PushID(f);
+         ImGui::Text("Float");
+         ImGui::NextColumn();
+         ImGui::Text("%f", *f);
+         ImGui::NextColumn();
+         ImGui::PopID();
+      }
+      else if (auto str = scfReadString(view)) {
+         ImGui::PushID(str);
+         ImGui::Text("String");
+         ImGui::NextColumn();
+         ImGui::Text("%s", str);
+         ImGui::NextColumn();
+         ImGui::PopID();
+      }
+      else {
+         SCFReader subreader = scfReadList(view);
+         if (!scfReaderNull(subreader)) {
+            if (ImGui::TreeNode("List")) {
+               ImGui::NextColumn(); ImGui::NextColumn();
+               _uiDoSCFReader(subreader);
+               ImGui::TreePop();
+            }
+            else {
+               ImGui::NextColumn(); ImGui::NextColumn();
+            }
+            
+         }
+         else {
+            scfReaderSkip(view);
+         }
+      }
+   }
+}
+
+static bool _doSCFTest(Window* wnd, SCFTestState& state) {
+   bool p_open = true;
+
+   if (ImGui::Begin("SCF Testing", &p_open, 0)) {
+      if (!state.writer) {
+         if (ImGui::Button("Create a writer")) {
+            state.writer = scfWriterCreate();
+         }
+      }
+
+      else{
+         ImGui::Columns(2);
+         
+         ImGui::InputInt("Int", &state.i);
+         ImGui::NextColumn();
+         if (ImGui::Button("Add##int")) {
+            scfWriteInt(state.writer, state.i);
+         }
+
+         ImGui::NextColumn();
+         ImGui::InputFloat("Float", &state.f);
+         ImGui::NextColumn();
+         if (ImGui::Button("Add##float")) {
+            scfWriteFloat(state.writer, state.f);
+         }
+
+         ImGui::NextColumn();
+         ImGui::InputText("String", state.stringBuff, 256);
+         ImGui::NextColumn();
+         if (ImGui::Button("Add##string")) {
+            scfWriteString(state.writer, state.stringBuff);
+         }
+
+         ImGui::NextColumn(); ImGui::NextColumn();
+         if (ImGui::Button("Start a new sublist")) {
+            scfWriteListBegin(state.writer);
+         }
+         ImGui::NextColumn(); ImGui::NextColumn();
+         if (ImGui::Button("End current sublist")) {
+            scfWriteListEnd(state.writer);
+         }
+
+         ImGui::NextColumn();
+
+         ImGui::Columns(1);
+
+         DEBUG_imShowWriterStats(state.writer);
+
+         if (ImGui::Button("Reset")) {
+            scfWriterDestroy(state.writer);
+            state.writer = nullptr;
+         }
+
+         if (ImGui::Button("Write and show results")) {
+            SCFTestResultState result;
+            result.data = scfWriteToBuffer(state.writer, &result.size);
+
+            scfWriterDestroy(state.writer);
+            state.writer = nullptr;
+
+            auto lbl = format("SCF Result##%p", result.data);
+
+            windowAddGUI(wnd, lbl.c_str(), [=](Window*wnd) mutable {
+               bool p_open = true;
+
+               ImGui::SetNextWindowSize(ImVec2(300, 200), ImGuiCond_Appearing);
+               if (ImGui::Begin(lbl.c_str(), &p_open, 0)) {
+                  auto view = scfView(result.data);
+
+                  ImGui::Columns(2);
+                  _uiDoSCFReader(view);
+                  ImGui::Columns(1);
+                  
+               }
+               ImGui::End();
+
+               if (!p_open) {
+                  delete[] result.data;
+               }
+
+               return p_open;
+            });
+         }
+
+         
+      }
+
+
+   }
+   ImGui::End();
+
+   if (!p_open && state.writer) {
+      scfWriterDestroy(state.writer);
+      state.writer = nullptr;
+   }
+
+   return p_open;
+}
+
+
 
 static void _mainMenu(GameData* game, Window* wnd) {
    if (ImGui::BeginMainMenuBar()) {
@@ -88,6 +249,13 @@ static void _mainMenu(GameData* game, Window* wnd) {
                bool p_open = true;
                ImGui::ShowDemoWindow(&p_open);
                return p_open;
+            });
+         }
+
+         if (ImGui::MenuItem("SCF Testing")) {
+            SCFTestState state;
+            windowAddGUI(wnd, "SCF Testing", [=](Window*wnd) mutable {
+               return _doSCFTest(wnd, state);
             });
          }
 
@@ -202,6 +370,7 @@ static void _imPaletteEditor(EGAPalette *pal) {
             }
             ImGui::NewLine();
          }
+         ImGui::Text("Color: %d", pal->colors[i]);
          ImGui::EndPopup();
 
       }
@@ -212,19 +381,21 @@ static void _imPaletteEditor(EGAPalette *pal) {
    }
    ImGui::NewLine();
    ImGui::PopStyleVar();
+
+   ImGui::SameLine();
+   ImGui::Text("Palette");
 }
 
 static void _showWindowedViewer(GameData* game, Window* wnd) {
 
    auto sz = windowSize(wnd);
    ImGui::SetNextWindowSize(ImVec2(sz.x/2.0f, sz.y/2.0f), ImGuiCond_Appearing);
-   static Int2 viewersz = { 100,100 };
+   static Int2 viewersz = { (i32)(EGA_RES_WIDTH * EGA_PIXEL_WIDTH), (i32)(EGA_RES_HEIGHT * EGA_PIXEL_HEIGHT) };
 
    if (ImGui::Begin("Viewer", nullptr, 0)) {
       _imPaletteEditor(&game->primaryView.palette);
 
-
-      _renderViewerTexture(game->primaryView.texture, viewersz);
+      _renderViewerTexture(game->primaryView.texture, viewersz);      
 
       if (_imWindowContextMenu("Viewer Context", 1)) {
          if (ImGui::Selectable("Edit Size")) {
