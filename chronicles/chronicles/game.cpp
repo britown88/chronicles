@@ -139,7 +139,7 @@ void gameUpdate(Game* game, Window* wnd) {
 
    egaRenderLine(ega, 
       { rand() % EGA_RES_WIDTH , rand() % EGA_RES_HEIGHT }, 
-      { rand() % EGA_RES_WIDTH , rand() % EGA_RES_HEIGHT }, x++ % 16);
+      { rand() % EGA_RES_WIDTH , rand() % EGA_RES_HEIGHT }, x++ % 13);
 
    egaTextureDecode(game->data.primaryView.egaTexture, game->data.primaryView.texture, &game->data.primaryView.palette);
    gameDoUI(wnd);

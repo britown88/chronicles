@@ -614,12 +614,10 @@ static void _showWindowedViewer(Window* wnd) {
 
       ImGui::Columns(2);
 
-      if (ImGui::IsWindowAppearing()) {
+      //if (ImGui::IsWindowAppearing()) {
          auto &imStyle = ImGui::GetStyle();
          ImGui::SetColumnWidth(0, uiPaletteEditorWidth() + imStyle.WindowPadding.x * 2);
-      }
-      
-     
+      //}
 
       uiPaletteEditor(wnd, &game->primaryView.palette);
 
