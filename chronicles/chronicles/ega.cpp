@@ -86,6 +86,7 @@ struct EGATexture {
    byte *pixelDataOffset = nullptr;
 
    ColorRGBA *decodePixels = nullptr;
+   EGAPalette lastDecodedPalette = { 0 };
 
    TexCleanFlag dirty = Tex_ALL_DIRTY;
 };
@@ -485,9 +486,16 @@ int egaTextureDecode(EGATexture *self, Texture* target, EGAPalette *palette){
 
    if (!self->decodePixels) {
       self->decodePixels = new ColorRGBA[self->w * self->h];
+      self->dirty |= Tex_DECODE_DIRTY;
+   }
+
+   //palette changed!
+   if (memcmp(palette->colors, self->lastDecodedPalette.colors, sizeof(EGAPalette))) {
+      self->lastDecodedPalette = *palette;
+      self->dirty |= Tex_DECODE_DIRTY;
    }
    
-   //if (self->dirty&Tex_DECODE_DIRTY) {
+   if (self->dirty&Tex_DECODE_DIRTY) {
       memset(self->decodePixels, 0, self->pixelCount * sizeof(ColorRGBA));
       u32 x, y;
       u32 asl = 0, psl = 0, dsl = 0;
@@ -511,7 +519,7 @@ int egaTextureDecode(EGATexture *self, Texture* target, EGAPalette *palette){
       }
 
       self->dirty &= ~Tex_DECODE_DIRTY;
-   //}
+   }
 
    textureSetPixels(target, (byte*)self->decodePixels);
    return 1;
@@ -625,6 +633,8 @@ void egaRenderPoint(EGATexture *target, Int2 pos, EGAPColor color, EGARegion *vp
    else {
       *ptr = ((*ptr) & 0xF0) | color;
    }
+
+   target->dirty = Tex_ALL_DIRTY;
 }
 void egaRenderLine(EGATexture *target, Int2 pos1, Int2 pos2, EGAPColor color, EGARegion *vp) {
    int dx = abs(pos2.x - pos1.x);
