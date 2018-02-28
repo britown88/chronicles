@@ -41,6 +41,7 @@ void gameUpdate(Game* game, Window* wnd);
 void gameDestroy(Game* game);
 void gameDoUI(Window* wnd);
 
+bool paletteExists(PaletteManager* manager, StringView name);
 void paletteSave(PaletteManager* manager, StringView name, EGAPalette *pal);
 void paletteLoad(PaletteManager* manager, StringView name, EGAPalette *pal);
 void paletteDelete(PaletteManager* manager, StringView pal);

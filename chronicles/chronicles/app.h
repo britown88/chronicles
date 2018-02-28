@@ -30,6 +30,7 @@ void windowRefreshSize(Window* wnd);
 Int2 windowSize(Window* wnd);
 Int2 windowClientArea(Window* wnd); // windowSize * scaleFactor
 float windowScale(Window* wnd); //set by dpi
+void windowClose(Window*wnd);
 
 // gui(wnd) is called every frame during the imgui update until it returns false
 // do your one-off imgui::begin()s here, use lambda capture for state

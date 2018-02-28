@@ -24,6 +24,7 @@ struct Window {
 
    Int2 size = { 0 }, clientSize = { 0 };
    float scale = 1.0f;
+   bool shouldClose = false;
 
    struct Dialog {
       std::function<bool(Window*)> dlg;
@@ -154,9 +155,9 @@ void appPollEvents(App* app) {
       case SDL_KEYDOWN:
       case SDL_KEYUP: {
          switch (event.key.keysym.scancode) {
-         case SDL_SCANCODE_ESCAPE:
-            app->running = false;
-            break;
+         //case SDL_SCANCODE_ESCAPE:
+         //   app->running = false;
+         //   break;
          }
          break;  }
       case SDL_WINDOWEVENT:
@@ -183,6 +184,9 @@ static void _beginFrame(App* app) {
 
 static void _updateGame(App* app) {
    gameUpdate(app->game, app->wnd);
+   if (app->wnd->shouldClose) {
+      app->running = false;
+   }
 }
 
 static void _renderFrame(App* app) {
@@ -228,6 +232,7 @@ void appStep(App* app) {
 Int2 windowSize(Window* wnd) { return wnd->size; }
 Int2 windowClientArea(Window* wnd) { return wnd->clientSize; }
 float windowScale(Window* wnd) { return wnd->scale; }
+void windowClose(Window*wnd) { wnd->shouldClose = true; }
 
 void windowRefreshSize(Window* wnd) {
    SDL_GetWindowSize(wnd->sdlWnd, &wnd->size.x, &wnd->size.y);

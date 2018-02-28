@@ -485,20 +485,27 @@ void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSiz
       }
 
       ImGui::SameLine();
+
       auto btnSave = ImGui::Button(ICON_FA_DOWNLOAD);
       if (ImGui::IsItemHovered()) ImGui::SetTooltip("Save");
+
       if (btnSave && currentNameLen != 0) {
+         if (paletteExists(game->assets.palettes, palName)) {
+            ImGui::OpenPopup("Save Confirm");
+         }
+         else {
+            paletteSave(game->assets.palettes, palName, pal);
+            ImGui::OpenPopup("Saved");
+         }
+      }
+
+      if (uiModalPopup("Save Confirm", "Palette Exists\nOverwrite?", uiModalTypes_YESNO) == uiModalResults_YES) {
          paletteSave(game->assets.palettes, palName, pal);
          ImGui::OpenPopup("Saved");
       }
-      if (ImGui::BeginPopupModal("Saved")) {
-         ImGui::Text("Saved!");
-         ImGui::SetKeyboardFocusHere();
-         if (ImGui::Button("OK") || ImGui::IsKeyPressed(SDL_SCANCODE_SPACE) || ImGui::IsKeyPressed(SDL_SCANCODE_RETURN)) {
-            ImGui::CloseCurrentPopup();
-         }
-         ImGui::EndPopup();
-      }
+
+      uiModalPopup("Saved", "Palette Saved!", uiModalTypes_OK);
+
 
       if (currentNameLen == 0) {
          ImGui::PopStyleVar();
@@ -602,6 +609,88 @@ void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSiz
    }
 }
 
+uiModalResult uiModalPopup(StringView title, StringView msg, uiModalType type, StringView icon) {
+   uiModalResult result = uiModalResults_CLOSED;
+
+   if (ImGui::BeginPopupModal(title, nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+      result = uiModalResults_OPEN;
+
+      if (icon) {
+         ImGui::Text(icon);
+         ImGui::SameLine();
+      }
+
+      ImGui::Text(msg);
+
+      switch (type) {
+      case uiModalTypes_YESNO: {
+         bool yes = ImGui::Button("Yes");
+         ImGui::SameLine();
+         bool no = ImGui::Button("No");
+
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_ESCAPE)) {
+            no = true;
+         }
+
+         if (yes) { result = uiModalResults_YES; }
+         else if (no) { result = uiModalResults_NO; }
+         break; }
+
+      case uiModalTypes_YESNOCANCEL: {
+         bool yes = ImGui::Button("Yes");
+         ImGui::SameLine();
+         bool no = ImGui::Button("No");
+         ImGui::SameLine();
+         bool cancel = ImGui::Button("Cancel");
+
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_ESCAPE)) {
+            cancel = true;
+         }
+
+         if (yes) { result = uiModalResults_YES; }
+         else if (no) { result = uiModalResults_NO; }
+         else if (cancel) { result = uiModalResults_CANCEL; }
+         break; }
+
+      case uiModalTypes_OK: {
+         bool ok = ImGui::Button("OK");
+
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_RETURN) ||
+             ImGui::IsKeyPressed(SDL_SCANCODE_SPACE)) {
+            ok = true;
+         }
+
+         if (ok) { result = uiModalResults_OK; }
+         break; }
+
+      case uiModalTypes_OKCANCEL: {
+         bool ok = ImGui::Button("OK");
+         ImGui::SameLine();
+         bool cancel = ImGui::Button("Cancel");
+
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_RETURN) ||
+            ImGui::IsKeyPressed(SDL_SCANCODE_SPACE)) {
+            ok = true;
+         }
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_ESCAPE)) {
+            cancel = true;
+         }
+
+         if (ok) { result = uiModalResults_OK; }
+         else if (cancel) { result = uiModalResults_CANCEL; }
+         break; }
+      }
+
+      if (result != uiModalResults_OPEN) {
+         ImGui::CloseCurrentPopup();
+      }
+
+      ImGui::EndPopup();       
+   }
+
+   return result;
+}
+
 
 static void _showWindowedViewer(Window* wnd) {
    auto game = gameGet();
@@ -654,10 +743,10 @@ static void _showWindowedViewer(Window* wnd) {
 
 void gameDoUI(Window* wnd) {
    auto game = gameGet();
-
    if (ImGui::IsKeyPressed(SDL_SCANCODE_F1)) {
       game->imgui.showUI = !game->imgui.showUI;
    }
+   
 
    if (game->imgui.showUI) {
       _mainMenu(wnd);
@@ -666,6 +755,12 @@ void gameDoUI(Window* wnd) {
    }
    else {
       _showFullScreenViewer(wnd);
+
+      if (ImGui::IsKeyPressed(SDL_SCANCODE_ESCAPE)) {
+         windowClose(wnd);
+      }
+
+
    }
    
 }

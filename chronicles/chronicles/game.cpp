@@ -80,6 +80,10 @@ static void _savePalettes(PaletteManager* manager) {
    delete[] out;
 }
 
+bool paletteExists(PaletteManager* manager, StringView name) {
+   return manager->palettes.find(name) != manager->palettes.end();
+}
+
 void paletteSave(PaletteManager* manager, StringView name, EGAPalette *pal) {
    manager->palettes[name] = *pal;
    _savePalettes(manager);
