@@ -13,6 +13,7 @@ enum PaletteEditorFlags_ {
 typedef byte PaletteEditorFlags;
 
 void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName = nullptr, u32 palNameSize = 0, PaletteEditorFlags flags = 0);
+void uiPaletteColorPicker(StringView label, EGAColor *color);
 float uiPaletteEditorWidth();
 float uiPaletteEditorHeight();
 

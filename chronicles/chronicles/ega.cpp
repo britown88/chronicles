@@ -560,9 +560,32 @@ u32 egaTextureGetWidth(EGATexture *self) { return self->w; }
 u32 egaTextureGetHeight(EGATexture *self) { return self->h; }
 EGARegion *egaTextureGetFullRegion(EGATexture *self) { return &self->fullRegion; }
 
-EGAPColor egaTextureGetColorAt(EGATexture *self, EGARegion *vp, u32 x, u32 y) {
+EGAPColor egaTextureGetColorAt(EGATexture *self, u32 x, u32 y, EGARegion *vp) {
    if (!vp) { vp = &self->fullRegion; }
-   return 0;
+
+   if (x >= vp->w || y >= vp->h) {
+      return EGA_COLOR_UNDEFINED;
+   }
+
+   x += vp->x;
+   y += vp->y;
+
+   if (x >= self->w || y >= self->h) {
+      return EGA_COLOR_UNDEFINED;
+   }
+
+   auto alphaPtr = self->alphaChannel + self->alphaSLWidth * y + (x >> 3);
+   if (*alphaPtr & (1 << (x & 7))) {
+      auto ptr = self->pixelData + self->pixelSLWidth * y + (x >> 1);
+      if (x & 1) {
+         return ((*ptr)) >> 4;
+      }
+      else {
+         return (*ptr)&15;
+      }
+   }
+   
+   return EGA_COLOR_UNDEFINED;
 }
 
 struct EGAFontFactory {

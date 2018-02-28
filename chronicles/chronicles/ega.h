@@ -65,7 +65,7 @@ typedef Recti EGARegion;
 // passing NULL to a render call will use this for the target automatically
 EGARegion *egaTextureGetFullRegion(EGATexture *self);
 
-EGAPColor egaTextureGetColorAt(EGATexture *self, EGARegion *vp, u32 x, u32 y);
+EGAPColor egaTextureGetColorAt(EGATexture *self, u32 x, u32 y, EGARegion *vp = nullptr);
 
 
 // The font factory manages fonts, theres only one "font" in EGA

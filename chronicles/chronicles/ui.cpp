@@ -345,6 +345,68 @@ float uiPaletteEditorHeight() {
    return btnSize + ImGui::GetFrameHeightWithSpacing() * 2 + imStyle.WindowPadding.y * 2;
 }
 
+void uiPaletteColorPicker(StringView label, EGAColor *color) {
+   if (ImGui::BeginPopup(label)) {
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2());
+      for (int y = 0; y < 8; ++y) {
+         for (int x = 0; x < 8; ++x) {
+            byte c = y * 8 + x;
+            auto egac = egaGetColor(c);
+
+            ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(egac.r, egac.g, egac.b, 255));
+            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(egac.r, egac.g, egac.b, 128));
+
+            ImGui::PushID(c);
+            if (ImGui::Button("", ImVec2(20, 20))) {
+               ImGui::CloseCurrentPopup();
+            }
+            if (ImGui::IsItemHovered()) {
+               *color = c;
+            }
+
+            ImGui::PopID();
+            ImGui::SameLine();
+
+            ImGui::PopStyleColor(2);
+         }
+         ImGui::NewLine();
+      }
+      ImGui::PopStyleVar();
+
+      //ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, imItemSpacing);
+      //ImGui::PushStyleColor(ImGuiCol_Button, imButtonColor);
+      //ImGui::PushStyleColor(ImGuiCol_ButtonHovered, imButtonHoveredColor);
+
+      //ImGui::SetCursorPosY(ImGui::GetCursorPosY() + imItemSpacing.y);
+
+      //if (flags&PaletteEditorFlags_ENCODE) {
+      //   auto btnAny = ImGui::Button(ICON_FA_QUESTION);
+      //   if (ImGui::IsItemHovered()) ImGui::SetTooltip("Allow Encoding to use\nany color here");
+
+      //   ImGui::SameLine();
+      //   auto btnUnused = ImGui::Button(ICON_FA_TIMES_CIRCLE);
+      //   if (ImGui::IsItemHovered()) ImGui::SetTooltip("Block Encoding from\nusing this slot");
+
+      //   if (btnAny) {
+      //      pal->colors[i] = EGA_COLOR_UNDEFINED;
+      //      ImGui::CloseCurrentPopup();
+      //   }
+
+      //   if (btnUnused) {
+      //      pal->colors[i] = EGA_COLOR_UNUSED;
+      //      ImGui::CloseCurrentPopup();
+      //   }
+      //}
+
+      ImGui::Text("Color: %d", *color);
+
+      //ImGui::PopStyleVar();
+      //ImGui::PopStyleColor(2);
+
+      ImGui::EndPopup();
+   }
+}
+
 void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSize, PaletteEditorFlags flags) {
 
    // keep track of strage variables
@@ -393,7 +455,7 @@ void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSiz
          float widgetWIdth = sz.x + imStyle.ItemSpacing.x + (imStyle.FramePadding.x * 2);
          ImGui::SameLine(ImGui::GetContentRegionAvailWidth() - widgetWIdth);//
          bool undef = ImGui::Button(ICON_FA_QUESTION);
-         if (ImGui::IsItemHovered()) ImGui::SetTooltip("Fille undefined");
+         if (ImGui::IsItemHovered()) ImGui::SetTooltip("Fill undefined");
          ImGui::SameLine();
          bool unused = ImGui::Button(ICON_FA_TIMES_CIRCLE);
          if (ImGui::IsItemHovered()) ImGui::SetTooltip("Fill unused");
@@ -423,72 +485,13 @@ void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSiz
          const char* btnText = (cval == EGA_COLOR_UNDEFINED) ? ICON_FA_QUESTION : (cval == EGA_COLOR_UNUSED ? ICON_FA_TIMES_CIRCLE : "");
 
          ImGui::PushID(i);
+         static const StringView cpickerLabel = "EGAColorPicker";
          if (ImGui::Button(btnText, ImVec2(btnSize, btnSize))) {
-            ImGui::OpenPopup("EGAColorPicker");
+            ImGui::OpenPopup(cpickerLabel);
          }
          if (ImGui::IsItemHovered()) ImGui::SetTooltip("Idx: %d\nCol: %d", i, pal->colors[i]);
 
-         if (ImGui::BeginPopup("EGAColorPicker")) {
-
-            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2());
-            for (int y = 0; y < 8; ++y) {
-               for (int x = 0; x < 8; ++x) {
-                  byte c = y * 8 + x;
-                  auto egac = egaGetColor(c);
-
-                  ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(egac.r, egac.g, egac.b, 255));
-                  ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(egac.r, egac.g, egac.b, 128));
-
-                  ImGui::PushID(c);
-                  if (ImGui::Button("", ImVec2(20, 20))) {
-                     ImGui::CloseCurrentPopup();
-                  }
-                  if (ImGui::IsItemHovered()) {
-                     pal->colors[i] = c;
-                  }
-
-                  ImGui::PopID();
-                  ImGui::SameLine();
-
-                  ImGui::PopStyleColor(2);
-               }
-               ImGui::NewLine();
-            }
-            ImGui::PopStyleVar();
-
-            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, imItemSpacing);
-            ImGui::PushStyleColor(ImGuiCol_Button, imButtonColor);
-            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, imButtonHoveredColor);
-
-            ImGui::SetCursorPosY(ImGui::GetCursorPosY() + imItemSpacing.y);
-
-            if (flags&PaletteEditorFlags_ENCODE) {
-               auto btnAny = ImGui::Button(ICON_FA_QUESTION);
-               if (ImGui::IsItemHovered()) ImGui::SetTooltip("Allow Encoding to use\nany color here");
-
-               ImGui::SameLine();
-               auto btnUnused = ImGui::Button(ICON_FA_TIMES_CIRCLE);
-               if (ImGui::IsItemHovered()) ImGui::SetTooltip("Block Encoding from\nusing this slot");
-
-               if (btnAny) {
-                  pal->colors[i] = EGA_COLOR_UNDEFINED;
-                  ImGui::CloseCurrentPopup();
-               }
-
-               if (btnUnused) {
-                  pal->colors[i] = EGA_COLOR_UNUSED;
-                  ImGui::CloseCurrentPopup();
-               }
-            }
-
-            ImGui::Text("Color: %d", pal->colors[i]);
-
-            ImGui::PopStyleVar();
-            ImGui::PopStyleColor(2);
-
-            ImGui::EndPopup();
-
-         }
+         uiPaletteColorPicker(cpickerLabel, &pal->colors[i]);
 
          ImGui::PopID();
          ImGui::PopStyleColor(2);

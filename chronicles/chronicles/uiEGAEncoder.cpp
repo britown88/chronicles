@@ -14,6 +14,7 @@ struct EncoderState {
    EGATexture *ega = nullptr;
    EGAPalette encPal;
    char palName[64];
+   EGAPColor clickedColor = 0;
 
    float zoomLevel = 1.0f;
    Int2 zoomOffset = {};
@@ -102,9 +103,13 @@ bool _doUI(Window* wnd, EncoderState &state) {
                egaTextureDecode(state.ega, state.pngTex, &state.encPal);
             }
 
+            auto &io = ImGui::GetIO();
+
             auto a = ImVec2(state.zoomOffset.x + p.x + rect.x, state.zoomOffset.y + p.y + rect.y);
             auto b = ImVec2(state.zoomOffset.x + p.x + rect.x + rect.w*state.zoomLevel, state.zoomOffset.y + p.y + rect.y + rect.h*state.zoomLevel);
 
+            float mouseX = (io.MousePos.x - p.x - state.zoomOffset.x) / state.zoomLevel;
+            float mouseY = (io.MousePos.y - p.y - state.zoomOffset.y) / state.zoomLevel;
             
             draw_list->PushClipRect(a, b, true);
             draw_list->AddRect(a, b, IM_COL32(0, 0, 0, 255));
@@ -121,18 +126,38 @@ bool _doUI(Window* wnd, EncoderState &state) {
                state.zoomOffset.x += ImGui::GetIO().MouseDelta.x; 
                state.zoomOffset.y += ImGui::GetIO().MouseDelta.y;
             }
-
-
             draw_list->AddImage((ImTextureID)textureGetHandle(state.pngTex), a, b);
 
-            auto &io = ImGui::GetIO();
+            
             if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows)) { 
 
                if (fabs(io.MouseWheel) > 0.0f) {
+                  auto zoom = state.zoomLevel;
                   state.zoomLevel = MIN(100, MAX(0.1f, state.zoomLevel + io.MouseWheel * 0.05f * state.zoomLevel));
 
                }
             }
+            if (mouseX > 0.0f && mouseX < texSize.x && mouseY > 0.0f && mouseY < texSize.y) {
+               ImGui::SetCursorPos(ImVec2(ImGui::GetStyle().WindowPadding.x, 0));
+               ImGui::Text("Mouse: (%.1f, %.1f)", mouseX, mouseY);
+
+               if (ImGui::IsMouseClicked(1)) {
+                  if (state.ega) {
+                     auto c = egaTextureGetColorAt(state.ega, (u32)mouseX, (u32)mouseY);
+                     if (c < EGA_COLOR_UNDEFINED) {
+                        state.clickedColor = c;
+                        ImGui::OpenPopup("egapicker");
+                     }
+
+                                       
+                  }
+               }
+            }
+
+            if (state.ega) {
+               uiPaletteColorPicker("egapicker", &state.encPal.colors[state.clickedColor]);
+            }           
+            
          }
 
          ImGui::EndChild();
