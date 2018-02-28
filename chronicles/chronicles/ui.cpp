@@ -339,6 +339,17 @@ float uiPaletteEditorWidth() {
 }
 
 void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSize, PaletteEditorFlags flags) {
+
+   // keep track of strage variables
+   enum {
+      STORE_PALNAME = 0,// void* (leaks)
+      STORE_PALNAMESIZE,// int
+      STORE_LOADOPENED, // bool
+      STORE_LOADCURSOR  // int
+   };
+
+   auto imStore = ImGui::GetStateStorage();
+
    auto game = gameGet();
    auto &imStyle = ImGui::GetStyle();
 
@@ -460,10 +471,10 @@ void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSiz
       if (!palName) {
          //not using a pre-allocated palName buffer so use window store
          // I guess this is fine that it leaks?? shrug
-         auto imStore = ImGui::GetStateStorage();
+         
 
-         auto storedPalName = imStore->GetVoidPtrRef(0);
-         auto storedPalSize = imStore->GetIntRef(1);
+         auto storedPalName = imStore->GetVoidPtrRef(STORE_PALNAME);
+         auto storedPalSize = imStore->GetIntRef(STORE_PALNAMESIZE);
 
          if (!*storedPalName) {
             *storedPalName = new char[128];
@@ -479,18 +490,25 @@ void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSiz
       ImGui::InputText("##Name", palName, palNameSize);
       ImGui::PopItemWidth();
 
-      auto currentNameLen = strlen(palName);
-      if (currentNameLen == 0) {
-         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha*0.5f);
-      }
-
       ImGui::SameLine();
 
-      auto btnSave = ImGui::Button(ICON_FA_DOWNLOAD);
-      if (ImGui::IsItemHovered()) ImGui::SetTooltip("Save");
+      // save button
+      auto currentNameLen = strlen(palName);
+      bool nameValid = currentNameLen != 0;
 
-      if (btnSave && currentNameLen != 0) {
-         if (paletteExists(game->assets.palettes, palName)) {
+      if (!nameValid) {
+         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha*0.5f);
+      }
+      
+      bool palExists = paletteExists(game->assets.palettes, palName);
+      auto btnSave = ImGui::Button(ICON_FA_DOWNLOAD);
+
+      static StringView ttip_save = "Save";
+      static StringView ttip_saveinvalid = "Save (File name can't be empty)";
+      if (ImGui::IsItemHovered()) ImGui::SetTooltip(nameValid ? ttip_save : ttip_saveinvalid);
+
+      if (btnSave && nameValid) {
+         if (palExists) {
             ImGui::OpenPopup("Save Confirm");
          }
          else {
@@ -498,25 +516,23 @@ void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSiz
             ImGui::OpenPopup("Saved");
          }
       }
-
-      if (uiModalPopup("Save Confirm", "Palette Exists\nOverwrite?", uiModalTypes_YESNO) == uiModalResults_YES) {
+      if (uiModalPopup("Save Confirm", "Palette Exists\nOverwrite?", uiModalTypes_YESNO, ICON_FA_EXCLAMATION) == uiModalResults_YES) {
          paletteSave(game->assets.palettes, palName, pal);
          ImGui::OpenPopup("Saved");
       }
-
-      uiModalPopup("Saved", "Palette Saved!", uiModalTypes_OK);
-
-
-      if (currentNameLen == 0) {
+      uiModalPopup("Saved", "Palette Saved!", uiModalTypes_OK, ICON_FA_CHECK);
+      
+      if (!nameValid) {
          ImGui::PopStyleVar();
       }
 
       ImGui::SameLine();
+
+      // load button
       auto btnLoad = ImGui::Button(ICON_FA_UPLOAD);
       if (ImGui::IsItemHovered()) ImGui::SetTooltip("Load");
 
-      auto storage = ImGui::GetStateStorage();
-      bool *loadOpened = storage->GetBoolRef(2, false);
+      bool *loadOpened = imStore->GetBoolRef(STORE_LOADOPENED, false);
 
       if (btnLoad) {
          ImGui::OpenPopup("Load Palette");
@@ -525,12 +541,15 @@ void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSiz
       if (ImGui::BeginPopup("Load Palette")) {
          static char search[64] = { 0 };
 
+         int *loadCursor = imStore->GetIntRef(STORE_LOADCURSOR, 0);
+
          if (ImGui::IsWindowAppearing()) {
             ImGui::SetKeyboardFocusHere();
          }
          ImGui::InputText(ICON_FA_SEARCH, search, 64);
 
          auto pals = paletteList(game->assets.palettes, search);
+         *loadCursor = MIN(*loadCursor, MAX(0, pals.size()-1));
 
          if (ImGui::BeginChild("List", ImVec2(ImGui::GetContentRegionAvailWidth(), ImGui::GetFrameHeightWithSpacing() * 5), true)) {
 
@@ -540,15 +559,22 @@ void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSiz
             else {
                auto &imStyle = ImGui::GetStyle();
                auto imBtnAlign = imStyle.ButtonTextAlign;
+               int palIdx = 0;
                for (auto p : pals) {
                   ImGui::PushID(p.c_str());
 
                   bool btnDelete = ImGui::Button(ICON_FA_TRASH_ALT);
                   if (ImGui::IsItemHovered()) ImGui::SetTooltip("Delete");
                   if (btnDelete) {
+                     ImGui::OpenPopup("Delete Confirm");
+                  }
+
+                  if (uiModalPopup("Delete Confirm", "Delete this palette?", uiModalTypes_YESNO, ICON_FA_EXCLAMATION_TRIANGLE) == uiModalResults_YES) {
                      paletteDelete(game->assets.palettes, p.c_str());
-                     ImGui::PopID();
-                     break;
+                  }
+
+                  if (palIdx == *loadCursor) {
+                     ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonHovered));
                   }
 
                   imStyle.ButtonTextAlign = ImVec2(0.f, 0.5f);
@@ -563,7 +589,28 @@ void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSiz
                      ImGui::CloseCurrentPopup();
                   }
                   imStyle.ButtonTextAlign = imBtnAlign;
+
+                  if (palIdx == *loadCursor) {
+                     ImGui::PopStyleColor();
+                  }
+
                   ImGui::PopID();
+                  ++palIdx;
+               }
+
+               if (ImGui::IsKeyPressed(SDL_SCANCODE_RETURN)) {
+                  auto &p = pals[*loadCursor];
+                  paletteLoad(game->assets.palettes, p.c_str(), pal);
+                  strcpy(palName, p.c_str());
+                  ImGui::CloseCurrentPopup();
+               }
+
+               if (ImGui::IsKeyPressed(SDL_SCANCODE_DOWN)) {
+                  ++*loadCursor;
+               }
+
+               if (ImGui::IsKeyPressed(SDL_SCANCODE_UP)) {
+                  --*loadCursor;
                }
             }
 
@@ -578,12 +625,25 @@ void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSiz
          }
       }
       ImGui::SameLine();
+
+      // refresh button
+      if (!palExists) {
+         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha*0.5f);
+      }
+
       auto btnRefresh = ImGui::Button(ICON_FA_SYNC_ALT);
-      if (ImGui::IsItemHovered()) ImGui::SetTooltip("Refresh");
-      if (btnRefresh) {
+      static StringView ttip_refresh = "Refresh";
+      static StringView ttip_refreshinvalid = "Refresh (palette not found)";
+      if (ImGui::IsItemHovered()) ImGui::SetTooltip(palExists ? ttip_refresh : ttip_refreshinvalid);
+      if (btnRefresh && palExists) {
          paletteLoad(game->assets.palettes, palName, pal);
       }
 
+      if (!palExists) {
+         ImGui::PopStyleVar();
+      }
+
+      // popout button
       if (!(flags&PaletteEditorFlags_POPPED_OUT)) {
          ImGui::SameLine();
          auto btnPopOut = ImGui::Button(ICON_FA_SIGN_OUT_ALT);
