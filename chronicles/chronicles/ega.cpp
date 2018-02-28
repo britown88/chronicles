@@ -125,6 +125,8 @@ void egaTextureDestroy(EGATexture *self) {
    delete self;
 }
 
+#pragma region OLD ENCODING CODE
+
 struct PaletteColor;
 
 struct PaletteEntry {
@@ -166,6 +168,27 @@ float GCRGB(byte component) {
    return GCRGBTable[component];
 }
 
+static f32 sRGB(byte b) {
+   f32 x = b / 255.0f;
+   if (x <= 0.00031308f) {
+      return 12.92f * x;
+   }
+   else {
+      return 1.055f*pow(x, (1.0f / 2.4f)) - 0.055f;
+   }
+}
+
+Float3 srgbToLinear(ColorRGB const&srgb) {
+   return { sRGB(srgb.r), sRGB(srgb.g), sRGB(srgb.b) };
+}
+Float3 srgbToLinear(ColorRGBA const&srgb) {
+   return { sRGB(srgb.r), sRGB(srgb.g), sRGB(srgb.b) };
+}
+
+f32 vDistSquared(Float3 const& a, Float3 const& b) {
+   return pow(b.x - a.x, 2) + pow(b.y - a.y, 2) + pow(b.z - a.z, 2);
+}
+
 float colorDistance(ColorRGBA c1, ColorRGBA c2) {
    float r, g, b;
    r = GCRGB(c1.r) - GCRGB(c2.r);
@@ -173,6 +196,10 @@ float colorDistance(ColorRGBA c1, ColorRGBA c2) {
    b = GCRGB(c1.b) - GCRGB(c2.b);
 
    return r * r + g * g + b * b;
+}
+
+float colorDistanceLinear(ColorRGBA c1, ColorRGBA c2) {
+   return vDistSquared(srgbToLinear(c1), srgbToLinear(c2));
 }
 
 ColorRGBA EGAColorLookup(byte c) {
@@ -259,6 +286,8 @@ byte closestEGA(int rgb) {
 
    return closest;
 }
+
+#pragma endregion
 
 EGATexture *egaTextureCreateFromTextureEncode(Texture *source, EGAPalette *targetPalette, EGAPalette *resultPalette) {
    int colorCounts[64];
