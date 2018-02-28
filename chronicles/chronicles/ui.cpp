@@ -487,7 +487,19 @@ void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSiz
          ImGui::PushID(i);
          static const StringView cpickerLabel = "EGAColorPicker";
          if (ImGui::Button(btnText, ImVec2(btnSize, btnSize))) {
-            ImGui::OpenPopup(cpickerLabel);
+            if (ImGui::GetIO().KeyCtrl) {
+               switch (pal->colors[i]) {
+               case EGA_COLOR_UNDEFINED:
+                  pal->colors[i] = EGA_COLOR_UNUSED;
+                  break;
+               default:
+                  pal->colors[i] = EGA_COLOR_UNDEFINED;
+                  break;
+               }
+            }
+            else {
+               ImGui::OpenPopup(cpickerLabel);
+            }
          }
          if (ImGui::IsItemHovered()) ImGui::SetTooltip("Idx: %d\nCol: %d", i, pal->colors[i]);
 

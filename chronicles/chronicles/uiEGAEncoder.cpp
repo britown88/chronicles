@@ -18,6 +18,8 @@ struct EncoderState {
 
    float zoomLevel = 1.0f;
    Int2 zoomOffset = {};
+
+   bool egaStretch = false;
 };
 
 static std::string _getPng() {
@@ -93,8 +95,12 @@ bool _doUI(Window* wnd, EncoderState &state) {
          if (state.pngTex) {
             auto csz = ImGui::GetContentRegionAvail();
             auto texSize = textureGetSize(state.pngTex);
-            auto rect = Recti{ 0,0, texSize.x, texSize.y }; //getProportionallyFitRect(textureGetSize(state.pngTex), { (i32)csz.x, (i32)csz.y });
-            rect.x = 0;
+            Float2 drawSize = { texSize.x, texSize.y };
+
+            if (state.egaStretch) {
+               drawSize.x *= EGA_PIXEL_WIDTH;
+               drawSize.y *= EGA_PIXEL_HEIGHT;
+            }
 
             ImDrawList* draw_list = ImGui::GetWindowDrawList();
             const ImVec2 p = ImGui::GetCursorScreenPos();
@@ -105,11 +111,16 @@ bool _doUI(Window* wnd, EncoderState &state) {
 
             auto &io = ImGui::GetIO();
 
-            auto a = ImVec2(state.zoomOffset.x + p.x + rect.x, state.zoomOffset.y + p.y + rect.y);
-            auto b = ImVec2(state.zoomOffset.x + p.x + rect.x + rect.w*state.zoomLevel, state.zoomOffset.y + p.y + rect.y + rect.h*state.zoomLevel);
+            auto a = ImVec2(state.zoomOffset.x + p.x, state.zoomOffset.y + p.y);
+            auto b = ImVec2(state.zoomOffset.x + p.x  + drawSize.x*state.zoomLevel, state.zoomOffset.y + p.y + drawSize.y*state.zoomLevel);
 
             float mouseX = (io.MousePos.x - p.x - state.zoomOffset.x) / state.zoomLevel;
             float mouseY = (io.MousePos.y - p.y - state.zoomOffset.y) / state.zoomLevel;
+
+            if (state.egaStretch) {
+               mouseX /= EGA_PIXEL_WIDTH;
+               mouseY /= EGA_PIXEL_HEIGHT;
+            }
             
             draw_list->PushClipRect(a, b, true);
             draw_list->AddRect(a, b, IM_COL32(0, 0, 0, 255));
@@ -118,7 +129,7 @@ bool _doUI(Window* wnd, EncoderState &state) {
             //draw_list->AddRectFilled(a, b, IM_COL32_BLACK_TRANS);
 
             
-            auto sz = ImVec2(rect.w*state.zoomLevel, rect.h*state.zoomLevel);
+            auto sz = ImVec2(drawSize.x*state.zoomLevel, drawSize.y*state.zoomLevel);
             //ImGui::Image((ImTextureID)textureGetHandle(state.pngTex), sz);
 
             ImGui::InvisibleButton("##dummy", csz);
@@ -182,6 +193,16 @@ bool _doUI(Window* wnd, EncoderState &state) {
             egaTextureDecode(state.ega, state.pngTex, &state.encPal);
          }
       }
+
+      ImGui::SameLine();
+      if (ImGui::BeginChild("Opts")) {
+         ImGui::Text("Options");
+         ImGui::Checkbox("EGA Stretch", &state.egaStretch);
+
+         ImGui::EndChild();
+      }
+
+      
    }
    ImGui::End();
 
