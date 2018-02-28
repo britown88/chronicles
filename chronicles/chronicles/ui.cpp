@@ -338,6 +338,13 @@ float uiPaletteEditorWidth() {
    return btnSize * 16 + imStyle.WindowPadding.x * 2;
 }
 
+float uiPaletteEditorHeight() {
+   auto &imStyle = ImGui::GetStyle();
+   auto lnHeight = ImGui::GetTextLineHeight();
+   float btnSize = lnHeight + imStyle.FramePadding.y;
+   return btnSize + ImGui::GetFrameHeightWithSpacing() * 2 + imStyle.WindowPadding.y * 2;
+}
+
 void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSize, PaletteEditorFlags flags) {
 
    // keep track of strage variables
@@ -362,7 +369,8 @@ void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSiz
       btnSize = MAX(btnSize, ImGui::GetContentRegionAvailWidth() / 16);
    }
 
-   size.y = btnSize + ImGui::GetFrameHeightWithSpacing() + ImGui::GetTextLineHeightWithSpacing() + imStyle.WindowPadding.y * 2;
+
+   size.y = btnSize + ImGui::GetFrameHeightWithSpacing() * 2 + imStyle.WindowPadding.y * 2;
    size.x = btnSize * 16 + imStyle.WindowPadding.x * 2;
 
    bool doUi = true;
@@ -374,7 +382,28 @@ void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSiz
    if (doUi) {
 
       if (!(flags&PaletteEditorFlags_POPPED_OUT)) {
+         ImGui::AlignTextToFramePadding();
          ImGui::Text("Palette Editor");
+      }
+
+      // undefined and unused buttons in the top right if using an encoding flag
+      if (flags&PaletteEditorFlags_ENCODE) {
+         static StringView encButtons = ICON_FA_QUESTION ICON_FA_TIMES_CIRCLE;
+         auto sz = ImGui::CalcTextSize(encButtons);
+         float widgetWIdth = sz.x + imStyle.ItemSpacing.x + (imStyle.FramePadding.x * 2);
+         ImGui::SameLine(ImGui::GetContentRegionAvailWidth() - widgetWIdth);//
+         bool undef = ImGui::Button(ICON_FA_QUESTION);
+         if (ImGui::IsItemHovered()) ImGui::SetTooltip("Fille undefined");
+         ImGui::SameLine();
+         bool unused = ImGui::Button(ICON_FA_TIMES_CIRCLE);
+         if (ImGui::IsItemHovered()) ImGui::SetTooltip("Fill unused");
+
+         if (undef) {
+            memset(pal->colors, EGA_COLOR_UNDEFINED, 16);
+         }
+         if (unused) {
+            memset(pal->colors, EGA_COLOR_UNUSED, 16);
+         }
       }
 
       auto imItemSpacing = imStyle.ItemSpacing;
@@ -611,6 +640,10 @@ void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSiz
 
                if (ImGui::IsKeyPressed(SDL_SCANCODE_UP)) {
                   --*loadCursor;
+               }
+
+               if (ImGui::IsKeyPressed(SDLK_ESCAPE)) {
+                  ImGui::CloseCurrentPopup();
                }
             }
 

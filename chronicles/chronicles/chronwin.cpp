@@ -50,6 +50,25 @@ std::string cwd() {
    return out;
 }
 
+std::string pathGetFilename(StringView path) {
+   std::string pathStr = path;
+   auto len = pathStr.size();
+
+   auto begin = 0;
+   
+   auto slash = pathStr.find_last_of("\\/");
+   if (slash != std::string::npos) {
+      begin = slash + 1;
+   }
+
+   auto dot = pathStr.find_last_of('.');
+   if (dot != std::string::npos) {
+      len = dot - begin;
+   }
+
+   return pathStr.substr(begin, len);
+}
+
 byte *readFullFile(StringView path, u64 *fsize) {
    byte *string;
    u64 fsizeBuffer = 0;

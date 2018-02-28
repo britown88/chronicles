@@ -19,3 +19,5 @@ std::string cwd();
 
 byte *readFullFile(StringView path, u64 *fsize);
 int writeBinaryFile(StringView path, byte* buffer, u64 size);
+
+std::string pathGetFilename(StringView path);

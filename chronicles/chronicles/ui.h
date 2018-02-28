@@ -14,6 +14,7 @@ typedef byte PaletteEditorFlags;
 
 void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName = nullptr, u32 palNameSize = 0, PaletteEditorFlags flags = 0);
 float uiPaletteEditorWidth();
+float uiPaletteEditorHeight();
 
 enum uiModalResults_ {
    uiModalResults_OK = 0,  // user clicked OK
