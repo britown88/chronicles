@@ -25,6 +25,8 @@ Float3 vNormalized(Float3 v);
 Float3 *vNormalize(Float3 *v);
 Float3 vScale(Float3 v, f32 s);
 
+f32 vDistSquared(Float3 const& a, Float3 const& b);
+
 typedef struct {
    i32 x, y, w, h;
 } Recti;

@@ -33,6 +33,9 @@ typedef struct {
 // useful externally for reference graphics
 ColorRGB egaGetColor(EGAColor c);
 
+// attempt to reduce a 3-byte rgb to 6 bit ega color
+EGAColor egaReduceRGB(ColorRGB c);
+
 
 // EGATextures are encoded images consistenting of 4 bits per pixel, referring to a palette index
 // These were stored in 4 seperate bit planes but are intervleaved on the backend here

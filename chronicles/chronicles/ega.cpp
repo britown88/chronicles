@@ -43,6 +43,13 @@ ColorRGB egaGetColor(EGAColor c) {
    return lookup[c];
 }
 
+//EGAColor egaReduceRGB(ColorRGB c) {
+//   auto lin = srgbToLinear(c);
+//   byte r = (byte)lin.x * 4.0f;
+//   byte g = (byte)lin.y * 4.0f;
+//   byte b = (byte)lin.z * 4.0f;
+//}
+
 /*
 pixel data organization
 

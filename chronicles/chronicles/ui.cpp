@@ -191,6 +191,41 @@ static bool _doSCFTest(Window* wnd, SCFTestState& state) {
    return p_open;
 }
 
+static void _startColorPicker(Window* wnd) {
+   windowAddGUI(wnd, "Color Picker??", [=](Window*wnd) {
+      bool p_open = true;
+
+      if (ImGui::Begin("Color Picker??", &p_open, ImGuiWindowFlags_AlwaysAutoResize)) {
+         static float c[3] = { 0.0f };
+
+         ImGui::ColorPicker4("##picker", (float*)&c, ImGuiColorEditFlags_NoSidePreview | ImGuiColorEditFlags_NoSmallPreview);
+
+
+         ColorRGB cbytes = { (byte)(c[0] * 255.0f), (byte)(c[1] * 255.0f) , (byte)(c[2] * 255.0f) };
+         auto lin = srgbToLinear(cbytes);
+         float lowestDIstance = FLT_MAX;
+         EGAColor egaclosest = 0;
+         for (byte i = 0; i < 64; ++i) {
+            auto egac = egaGetColor(i);
+            auto egalin = srgbToLinear(egac);
+            auto dist = vDistSquared(lin, egalin);
+            if (dist < lowestDIstance) {
+               lowestDIstance = dist;
+               egaclosest = i;
+            }
+         }
+
+         auto finalc = egaGetColor(egaclosest);
+         auto c4 = ImGui::ColorConvertU32ToFloat4(IM_COL32(finalc.r, finalc.g, finalc.g, 255));
+
+         ImGui::ColorButton("EGA", c4);
+         
+      }
+      ImGui::End();
+
+      return p_open;
+   });
+}
 
 
 static void _mainMenu( Window* wnd) {
@@ -271,6 +306,10 @@ static void _mainMenu( Window* wnd) {
       if (ImGui::BeginMenu("Tools")) {
          if (ImGui::MenuItem("EGA Encoder")) {
             uiToolStartEGAEncoder(wnd);
+         }
+
+         if (ImGui::MenuItem("Color Picker")) {
+            _startColorPicker(wnd);
          }
 
          ImGui::EndMenu();
