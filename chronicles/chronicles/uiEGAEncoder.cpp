@@ -20,6 +20,7 @@ struct EncoderState {
    Int2 zoomOffset = {};
 
    bool egaStretch = false;
+   ImVec4 bgColor;
 };
 
 static std::string _getPng() {
@@ -95,12 +96,15 @@ bool _doUI(Window* wnd, EncoderState &state) {
          if (state.pngTex) {
             auto csz = ImGui::GetContentRegionAvail();
             auto texSize = textureGetSize(state.pngTex);
-            Float2 drawSize = { texSize.x, texSize.y };
+            float pxWidth = 1.0f;
+            float pxHeight = 1.0f;
 
             if (state.egaStretch) {
-               drawSize.x *= EGA_PIXEL_WIDTH;
-               drawSize.y *= EGA_PIXEL_HEIGHT;
+               pxWidth = EGA_PIXEL_WIDTH;
+               pxHeight = EGA_PIXEL_HEIGHT;
             }
+
+            Float2 drawSize = { texSize.x * pxWidth, texSize.y * pxHeight };
 
             ImDrawList* draw_list = ImGui::GetWindowDrawList();
             const ImVec2 p = ImGui::GetCursorScreenPos();
@@ -114,17 +118,17 @@ bool _doUI(Window* wnd, EncoderState &state) {
             auto a = ImVec2(state.zoomOffset.x + p.x, state.zoomOffset.y + p.y);
             auto b = ImVec2(state.zoomOffset.x + p.x  + drawSize.x*state.zoomLevel, state.zoomOffset.y + p.y + drawSize.y*state.zoomLevel);
 
-            float mouseX = (io.MousePos.x - p.x - state.zoomOffset.x) / state.zoomLevel;
-            float mouseY = (io.MousePos.y - p.y - state.zoomOffset.y) / state.zoomLevel;
+            float mouseX = (io.MousePos.x - p.x - state.zoomOffset.x) / state.zoomLevel / pxWidth;
+            float mouseY = (io.MousePos.y - p.y - state.zoomOffset.y) / state.zoomLevel / pxHeight;
 
-            if (state.egaStretch) {
-               mouseX /= EGA_PIXEL_WIDTH;
-               mouseY /= EGA_PIXEL_HEIGHT;
-            }
+            bool mouseInImage = mouseX > 0.0f && mouseX < texSize.x && mouseY > 0.0f && mouseY < texSize.y;
             
             draw_list->PushClipRect(a, b, true);
             draw_list->AddRect(a, b, IM_COL32(0, 0, 0, 255));
-            ImGui::RenderColorRectWithAlphaCheckerboard(a, b, IM_COL32_BLACK_TRANS, 10 * state.zoomLevel, ImVec2());
+
+            auto bgCol = ImGui::GetColorU32(state.bgColor);
+
+            ImGui::RenderColorRectWithAlphaCheckerboard(a, b, bgCol, 10 * state.zoomLevel, ImVec2());
             draw_list->PopClipRect();
             //draw_list->AddRectFilled(a, b, IM_COL32_BLACK_TRANS);
 
@@ -133,42 +137,59 @@ bool _doUI(Window* wnd, EncoderState &state) {
             //ImGui::Image((ImTextureID)textureGetHandle(state.pngTex), sz);
 
             ImGui::InvisibleButton("##dummy", csz);
-            if (ImGui::IsItemActive() && ImGui::IsMouseDragging()) { 
-               state.zoomOffset.x += ImGui::GetIO().MouseDelta.x; 
-               state.zoomOffset.y += ImGui::GetIO().MouseDelta.y;
+            if (ImGui::IsItemActive()){
+               if (ImGui::IsMouseDragging()) {
+                  state.zoomOffset.x += ImGui::GetIO().MouseDelta.x;
+                  state.zoomOffset.y += ImGui::GetIO().MouseDelta.y;
+               }
             }
-            draw_list->AddImage((ImTextureID)textureGetHandle(state.pngTex), a, b);
-
-            
-            if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows)) { 
-
+            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenOverlapped)) {
                if (fabs(io.MouseWheel) > 0.0f) {
                   auto zoom = state.zoomLevel;
                   state.zoomLevel = MIN(100, MAX(0.1f, state.zoomLevel + io.MouseWheel * 0.05f * state.zoomLevel));
 
+                  state.zoomOffset.x = -(mouseX * state.zoomLevel * pxWidth - (io.MousePos.x - p.x));
+                  state.zoomOffset.y = -(mouseY * state.zoomLevel * pxHeight - (io.MousePos.y - p.y));
+               }
+
+               if (mouseInImage) {
+                  if (ImGui::IsMouseClicked(1)) {
+                     if (state.ega) {
+                        auto c = egaTextureGetColorAt(state.ega, (u32)mouseX, (u32)mouseY);
+                        if (c < EGA_COLOR_UNDEFINED) {
+                           state.clickedColor = c;
+                           ImGui::OpenPopup("egapicker");
+                        }
+                     }
+                  }
                }
             }
-            if (mouseX > 0.0f && mouseX < texSize.x && mouseY > 0.0f && mouseY < texSize.y) {
-               ImGui::SetCursorPos(ImVec2(ImGui::GetStyle().WindowPadding.x, 0));
+
+            draw_list->AddImage((ImTextureID)textureGetHandle(state.pngTex), a, b);
+
+            auto &imStyle = ImGui::GetStyle();
+            static float statsCol = 32.0f;
+
+            ImGui::SetCursorPos(imStyle.WindowPadding);
+            ImGui::Text(ICON_FA_SEARCH); ImGui::SameLine(statsCol);
+            ImGui::Text("Scale: %.1f%%",state.zoomLevel * 100.0f);
+
+            if (mouseInImage) {    
+               ImGui::Text(ICON_FA_MOUSE_POINTER); ImGui::SameLine(statsCol);
                ImGui::Text("Mouse: (%.1f, %.1f)", mouseX, mouseY);
 
-               if (ImGui::IsMouseClicked(1)) {
-                  if (state.ega) {
-                     auto c = egaTextureGetColorAt(state.ega, (u32)mouseX, (u32)mouseY);
-                     if (c < EGA_COLOR_UNDEFINED) {
-                        state.clickedColor = c;
-                        ImGui::OpenPopup("egapicker");
-                     }
-
-                                       
+               if (state.ega) {
+                  auto c = egaTextureGetColorAt(state.ega, (u32)mouseX, (u32)mouseY);
+                  if (c < EGA_COLOR_UNDEFINED) {
+                     ImGui::Text(ICON_FA_PAINT_BRUSH); ImGui::SameLine(statsCol);
+                     ImGui::Text("Color: %d (Palette %d)", state.encPal.colors[c], c);
                   }
                }
             }
 
             if (state.ega) {
                uiPaletteColorPicker("egapicker", &state.encPal.colors[state.clickedColor]);
-            }           
-            
+            }
          }
 
          ImGui::EndChild();
@@ -195,14 +216,19 @@ bool _doUI(Window* wnd, EncoderState &state) {
       }
 
       ImGui::SameLine();
-      if (ImGui::BeginChild("Opts")) {
-         ImGui::Text("Options");
-         ImGui::Checkbox("EGA Stretch", &state.egaStretch);
+      ImGui::BeginGroup();
 
-         ImGui::EndChild();
-      }
+      ImGui::Text("Options");
+      ImGui::Checkbox("EGA Stretch", &state.egaStretch);
 
-      
+      ImGui::ColorEdit4("BG", (float*)&state.bgColor,
+         ImGuiColorEditFlags_NoInputs |
+         ImGuiColorEditFlags_AlphaPreview | 
+         ImGuiColorEditFlags_HSV |
+         ImGuiColorEditFlags_AlphaBar |
+         ImGuiColorEditFlags_PickerHueBar);
+
+      ImGui::EndGroup();      
    }
    ImGui::End();
 
