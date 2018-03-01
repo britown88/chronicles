@@ -81,6 +81,10 @@ typedef struct {
 } ColorRGBf;
 
 typedef struct {
+   f32 h, s, v;
+} ColorHSV;
+
+typedef struct {
    f32 r, g, b, a;
 } ColorRGBAf;
 #pragma pack(pop)

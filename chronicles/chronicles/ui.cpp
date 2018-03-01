@@ -345,7 +345,40 @@ float uiPaletteEditorHeight() {
    return btnSize + ImGui::GetFrameHeightWithSpacing() * 2 + imStyle.WindowPadding.y * 2;
 }
 
+#include <algorithm>
+
+static u32 _8x8indexFromHSV(ColorHSV const& hsv) {
+   auto hrad = hsv.h * 0.0174533f;
+   float x = cosf(hrad) / 4.0f;
+   float y = sinf(hrad) / 4.0f;
+
+   x *= hsv.s;
+   y *= hsv.s;
+
+   byte gridX = (byte)(4.0f + x);
+   byte gridY = (byte)(4.0f + y);
+
+   return gridY * 8 + gridX;
+}
+
 void uiPaletteColorPicker(StringView label, EGAColor *color) {
+
+   //struct EGAHSV{
+   //   ColorHSV hsv = { 0 };
+   //   EGAColor ega = 0;
+   //};
+
+   //std::vector<EGAHSV> colors(64);
+   //for (EGAColor i = 0; i < 64; ++i) {
+   //   colors[i].ega = i;
+   //   colors[i].hsv = srgbToHSV(egaGetColor(i));
+   //}
+
+   //std::sort(colors.begin(), colors.end(), [](EGAHSV const&a, EGAHSV const&b) {
+   //   return _8x8indexFromHSV(a.hsv) > _8x8indexFromHSV(b.hsv);
+   //});
+
+
    if (ImGui::BeginPopup(label)) {
       ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2());
       for (int y = 0; y < 8; ++y) {

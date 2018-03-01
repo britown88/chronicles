@@ -51,3 +51,10 @@ static bool rectiIntersects(Recti a, Recti b) {
 }
 
 Recti getProportionallyFitRect(Int2 srcSize, Int2 destSize);
+
+
+
+Float3 srgbToLinear(ColorRGB const&srgb);
+Float3 srgbToLinear(ColorRGBA const&srgb);
+
+ColorHSV srgbToHSV(ColorRGB const&srgb);

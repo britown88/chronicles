@@ -186,6 +186,34 @@ Float3 srgbToLinear(ColorRGBA const&srgb) {
    return { sRGB(srgb.r), sRGB(srgb.g), sRGB(srgb.b) };
 }
 
+ColorHSV srgbToHSV(ColorRGB const&srgb) {
+   float r = srgb.r / 255.0f;
+   float g = srgb.g / 255.0f;
+   float b = srgb.b / 255.0f;
+
+   auto cmax = MAX(r, MAX(g, b));
+   auto cmin = MIN(r, MIN(g, b));
+   auto delta = cmax - cmin;
+
+   ColorHSV out = { 0 };
+   if (cmax == r) {
+      out.h = 60.0f * fmodf((g - b) / delta, 6.0f);
+   }
+   else if (cmax == g) {
+      out.h = 60.0f * ((b - r) / delta + 2);
+   }
+   else {
+      out.h = 60.0f * ((r - g) / delta + 4);
+   }
+
+   if (fabs(cmax) > 0.0001f) {
+      out.s = delta / cmax;
+   }
+
+   out.v = cmax;
+   return out;
+}
+
 f32 vDistSquared(Float3 const& a, Float3 const& b) {
    return pow(b.x - a.x, 2) + pow(b.y - a.y, 2) + pow(b.z - a.z, 2);
 }
