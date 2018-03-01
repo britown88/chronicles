@@ -137,6 +137,20 @@ bool _doUI(Window* wnd, EncoderState &state) {
             //ImGui::Image((ImTextureID)textureGetHandle(state.pngTex), sz);
 
             ImGui::InvisibleButton("##dummy", csz);
+            if (ImGui::BeginDragDropTarget()) {
+
+               if (auto payload = ImGui::AcceptDragDropPayload(UI_DRAGDROP_PALCOLOR)) {
+                  if (state.ega && mouseInImage) {
+                     auto c = egaTextureGetColorAt(state.ega, (u32)mouseX, (u32)mouseY);
+                     if (c < EGA_COLOR_UNDEFINED) {
+                        state.encPal.colors[c] = *(byte*)payload->Data;
+                     }
+                  }
+               }
+
+               ImGui::EndDragDropTarget();
+            }
+
             if (ImGui::IsItemActive()){
                if (ImGui::IsMouseDragging()) {
                   state.zoomOffset.x += ImGui::GetIO().MouseDelta.x;

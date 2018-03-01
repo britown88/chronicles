@@ -2,6 +2,8 @@
 
 #include "ega.h"
 
+#define UI_DRAGDROP_PALCOLOR "EGAPALCOLOR"
+
 typedef struct Window Window;
 typedef struct GameData GameData;
 void uiToolStartEGAEncoder(Window* wnd);

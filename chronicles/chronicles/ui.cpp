@@ -360,6 +360,11 @@ void uiPaletteColorPicker(StringView label, EGAColor *color) {
             if (ImGui::Button("", ImVec2(20, 20))) {
                ImGui::CloseCurrentPopup();
             }
+            if (ImGui::BeginDragDropSource(0, 0)) {
+               ImGui::SetDragDropPayload(UI_DRAGDROP_PALCOLOR, &c, 1, ImGuiCond_Once);
+               ImGui::Button("", ImVec2(20, 20));
+               ImGui::EndDragDropSource();
+            }
             if (ImGui::IsItemHovered()) {
                *color = c;
             }
@@ -455,9 +460,21 @@ void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSiz
          float widgetWIdth = sz.x + imStyle.ItemSpacing.x + (imStyle.FramePadding.x * 2);
          ImGui::SameLine(ImGui::GetContentRegionAvailWidth() - widgetWIdth);//
          bool undef = ImGui::Button(ICON_FA_QUESTION);
+         if (ImGui::BeginDragDropSource(0, 0)) {
+            auto c = EGA_COLOR_UNDEFINED;
+            ImGui::SetDragDropPayload(UI_DRAGDROP_PALCOLOR, &c, 1, ImGuiCond_Once);
+            ImGui::Button(ICON_FA_QUESTION, ImVec2(btnSize, btnSize));
+            ImGui::EndDragDropSource();
+         }
          if (ImGui::IsItemHovered()) ImGui::SetTooltip("Fill undefined");
          ImGui::SameLine();
          bool unused = ImGui::Button(ICON_FA_TIMES_CIRCLE);
+         if (ImGui::BeginDragDropSource(0, 0)) {
+            auto c = EGA_COLOR_UNUSED;
+            ImGui::SetDragDropPayload(UI_DRAGDROP_PALCOLOR, &c, 1, ImGuiCond_Once);
+            ImGui::Button(UI_DRAGDROP_PALCOLOR, ImVec2(btnSize, btnSize));
+            ImGui::EndDragDropSource();
+         }
          if (ImGui::IsItemHovered()) ImGui::SetTooltip("Fill unused");
 
          if (undef) {
@@ -486,7 +503,24 @@ void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSiz
 
          ImGui::PushID(i);
          static const StringView cpickerLabel = "EGAColorPicker";
-         if (ImGui::Button(btnText, ImVec2(btnSize, btnSize))) {
+
+         auto btnPressed = ImGui::Button(btnText, ImVec2(btnSize, btnSize));
+
+         if (ImGui::BeginDragDropSource(0, 0)) {
+            ImGui::SetDragDropPayload(UI_DRAGDROP_PALCOLOR, &pal->colors[i], 1, ImGuiCond_Once);
+            ImGui::Button(btnText, ImVec2(btnSize, btnSize));
+            ImGui::EndDragDropSource();
+         }
+         if (ImGui::BeginDragDropTarget()) {
+            if (auto payload = ImGui::AcceptDragDropPayload(UI_DRAGDROP_PALCOLOR)) {
+               pal->colors[i] = *(byte*)payload->Data;
+            }
+            ImGui::EndDragDropTarget();
+         }
+         if (ImGui::IsItemHovered()) ImGui::SetTooltip("Idx: %d\nCol: %d", i, pal->colors[i]);
+         
+
+         if (btnPressed) {
             if (ImGui::GetIO().KeyCtrl) {
                switch (pal->colors[i]) {
                case EGA_COLOR_UNDEFINED:
@@ -501,7 +535,6 @@ void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSiz
                ImGui::OpenPopup(cpickerLabel);
             }
          }
-         if (ImGui::IsItemHovered()) ImGui::SetTooltip("Idx: %d\nCol: %d", i, pal->colors[i]);
 
          uiPaletteColorPicker(cpickerLabel, &pal->colors[i]);
 
