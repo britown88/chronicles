@@ -26,6 +26,7 @@ struct EncoderState {
 
    std::string winName;
    Int2 selectedSize = { 0 };
+   Int2 lastMouse = { 0 };
 };
 
 static void _stateTexCleanup(EncoderState &state) {
@@ -297,6 +298,18 @@ bool _doUI(Window* wnd, EncoderState &state) {
 
                   state.zoomOffset.x = -(mouseX * state.zoomLevel * pxWidth - (io.MousePos.x - p.x));
                   state.zoomOffset.y = -(mouseY * state.zoomLevel * pxHeight - (io.MousePos.y - p.y));
+               }
+
+               if (ImGui::IsMouseDown(0)) {
+                  if (state.ega) {
+                     Int2 m = { (i32)mouseX, (i32)mouseY };
+                     egaRenderLine(state.ega, state.lastMouse, m, 0);
+                     state.lastMouse = m;
+
+
+                     //egaRenderPoint(state.ega, { (i32)mouseX, (i32)mouseY }, 0);
+                  }
+
                }
 
                if (mouseInImage) {

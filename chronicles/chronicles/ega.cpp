@@ -609,7 +609,8 @@ EGAPColor egaTextureGetColorAt(EGATexture *self, u32 x, u32 y, EGARegion *vp) {
    x += vp->x;
    y += vp->y;
 
-   if (x >= self->w || y >= self->h) {
+   if (x >= self->w || y >= self->h ||
+      x < 0 || y < 0) {
       return EGA_COLOR_UNDEFINED;
    }
 
@@ -679,10 +680,17 @@ void egaRenderTexturePartial(EGATexture *target, Int2 pos, EGATexture *tex, Rect
 void egaRenderPoint(EGATexture *target, Int2 pos, EGAPColor color, EGARegion *vp) {
    if (!vp) { vp = &target->fullRegion; }
 
+   if (pos.x >= vp->w || pos.y >= vp->h) {
+      return;
+   }
+
    pos.x += vp->x;
    pos.y += vp->y;
 
-   if (pos.x >= vp->w || pos.y >= vp->h) { return; }
+   if (pos.x >= target->w || pos.y >= target->h ||
+         pos.x < 0 || pos.y < 0) {
+      return;
+   }
 
    auto alphaPtr = target->alphaChannel + target->alphaSLWidth * pos.y + (pos.x >> 3);
    *alphaPtr |= 1 << (pos.x & 7);
@@ -733,7 +741,7 @@ void egaRenderLine(EGATexture *target, Int2 pos1, Int2 pos2, EGAPColor color, EG
       egaRenderPoint(target, { (i32)x1, (i32)y1 }, color, vp);
    }
    else {
-      if (_y0 > _y1) {//flip
+      if (pos1.y > pos2.y) {//flip
          x0 = pos2.x; y0 = pos2.y;
          x1 = pos1.x; y1 = pos1.y;
       }

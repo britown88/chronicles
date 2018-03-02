@@ -14,7 +14,7 @@ typedef struct PaletteManager PaletteManager;
 struct GameData {
    struct {
       ColorRGBAf bgClearColor = { 0.45f, 0.55f, 0.60f, 1.0f };  // clear color behond all imgui windows
-      bool showUI = false;                               // whether to show the ui or just a fullscreen viewer
+      bool showUI = true;                               // whether to show the ui or just a fullscreen viewer
    } imgui;
 
    struct {
