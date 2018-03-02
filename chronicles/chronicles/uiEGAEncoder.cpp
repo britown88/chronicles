@@ -9,6 +9,8 @@
 
 #include "imgui_internal.h" // for checkerboard
 
+#include "SDL2/SDL_scancode.h"
+
 struct EncoderState {
    Texture* pngTex = nullptr;
    EGATexture *ega = nullptr;
@@ -53,6 +55,8 @@ bool _doUI(Window* wnd, EncoderState &state) {
    auto game = gameGet();
    bool p_open = true;
 
+   
+
    ImGui::SetNextWindowSize(ImVec2(500, 800), ImGuiCond_Appearing);
    if (ImGui::Begin("EGA Encoder", &p_open, ImGuiWindowFlags_MenuBar)) {
       if (ImGui::BeginMenuBar()) {
@@ -92,7 +96,7 @@ bool _doUI(Window* wnd, EncoderState &state) {
 
       auto y = ImGui::GetCursorPosY();
 
-      if (ImGui::BeginChild("DrawArea", ImVec2(sz.x, sz.y - palHeight), true)) {
+      if (ImGui::BeginChild("DrawArea", ImVec2(sz.x, sz.y - palHeight), true, ImGuiWindowFlags_NoScrollWithMouse)) {
          if (state.pngTex) {
             auto csz = ImGui::GetContentRegionAvail();
             auto texSize = textureGetSize(state.pngTex);
@@ -143,7 +147,8 @@ bool _doUI(Window* wnd, EncoderState &state) {
                   if (state.ega && mouseInImage) {
                      auto c = egaTextureGetColorAt(state.ega, (u32)mouseX, (u32)mouseY);
                      if (c < EGA_COLOR_UNDEFINED) {
-                        state.encPal.colors[c] = *(byte*)payload->Data;
+                        auto plData = (uiDragDropPalColor*)payload->Data;
+                        state.encPal.colors[c] = plData->color;
                      }
                   }
                }
@@ -152,13 +157,13 @@ bool _doUI(Window* wnd, EncoderState &state) {
             }
 
             if (ImGui::IsItemActive()){
-               if (ImGui::IsMouseDragging()) {
+               if (io.KeyCtrl && ImGui::IsMouseDragging()) {
                   state.zoomOffset.x += ImGui::GetIO().MouseDelta.x;
                   state.zoomOffset.y += ImGui::GetIO().MouseDelta.y;
                }
             }
             if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenOverlapped)) {
-               if (fabs(io.MouseWheel) > 0.0f) {
+               if (io.KeyCtrl && fabs(io.MouseWheel) > 0.0f) {
                   auto zoom = state.zoomLevel;
                   state.zoomLevel = MIN(100, MAX(0.1f, state.zoomLevel + io.MouseWheel * 0.05f * state.zoomLevel));
 
@@ -185,8 +190,13 @@ bool _doUI(Window* wnd, EncoderState &state) {
             static float statsCol = 32.0f;
 
             ImGui::SetCursorPos(imStyle.WindowPadding);
-            ImGui::Text(ICON_FA_SEARCH); ImGui::SameLine(statsCol);
-            ImGui::Text("Scale: %.1f%%",state.zoomLevel * 100.0f);
+            ImGui::Text(ICON_FA_SEARCH); ImGui::SameLine(statsCol); 
+            ImGui::Text("Scale: %.1f%%",state.zoomLevel * 100.0f); ImGui::SameLine();
+            //if (ImGui::Button("Reset")) {
+            //   state.zoomOffset = { 0,0 };
+            //   state.zoomLevel = 0.f;
+            //}
+            //
 
             if (mouseInImage) {    
                ImGui::Text(ICON_FA_MOUSE_POINTER); ImGui::SameLine(statsCol);

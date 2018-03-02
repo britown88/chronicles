@@ -4,6 +4,11 @@
 
 #define UI_DRAGDROP_PALCOLOR "EGAPALCOLOR"
 
+struct uiDragDropPalColor {
+   EGAColor color;         // 0-63
+   EGAPColor paletteIndex; // use EGA_PALETTE_COLORS for null
+};
+
 typedef struct Window Window;
 typedef struct GameData GameData;
 void uiToolStartEGAEncoder(Window* wnd);
