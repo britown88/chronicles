@@ -28,6 +28,18 @@ struct EncoderState {
    Int2 selectedSize = { 0 };
 };
 
+static void _stateTexCleanup(EncoderState &state) {
+   if (state.pngTex) {
+      textureDestroy(state.pngTex);
+      state.pngTex = nullptr;
+   }
+
+   if (state.ega) {
+      egaTextureDestroy(state.ega);
+      state.ega = nullptr;
+   }
+}
+
 static std::string _getPng() {
    OpenFileConfig cfg;
    cfg.filterNames = "PNG Image (*.png)";
@@ -40,14 +52,9 @@ static std::string _getPng() {
 static void _loadPNG(EncoderState &state) {
    auto png = _getPng();
    if (!png.empty()) {
-      if (state.pngTex) {
-         textureDestroy(state.pngTex);
-      }
-      state.pngTex = textureCreateFromPath(png.c_str(), { RepeatType_CLAMP, FilterType_NEAREST });
-      if (state.ega) {
-         egaTextureDestroy(state.ega);
-         state.ega = nullptr;
-      }
+      
+      _stateTexCleanup(state);
+      state.pngTex = textureCreateFromPath(png.c_str(), { RepeatType_CLAMP, FilterType_NEAREST });      
 
       auto palName = pathGetFilename(png.c_str());
       strcpy(state.palName, palName.c_str());
@@ -60,7 +67,9 @@ static void _doToolbar(Window* wnd, EncoderState &state) {
    auto &imStyle = ImGui::GetStyle();
 
    if (ImGui::CollapsingHeader("Palette", ImGuiTreeNodeFlags_DefaultOpen)) {
+      ImGui::Indent();
       uiPaletteEditor(wnd, &state.encPal, state.palName, 64, state.ega ? 0 : PaletteEditorFlags_ENCODE);
+      ImGui::Unindent();
    }
    if (ImGui::CollapsingHeader("Image", ImGuiTreeNodeFlags_DefaultOpen)) {
 
@@ -103,6 +112,26 @@ static void _doToolbar(Window* wnd, EncoderState &state) {
       if (!state.ega) { ImGui::PopStyleVar(); }
 
       ImGui::Unindent();
+
+      //do button logic
+      if (btnNew) {
+         ImGui::OpenPopup("New Image Size");
+      }
+      if (ImGui::BeginPopupModal("New Image Size")) {
+         ImGui::Dummy(ImVec2(200, 0));
+         ImGui::DragInt2("Size", (i32*)&state.selectedSize, 1, 0, 0);
+         if (ImGui::Button("Create!")) {
+            _stateTexCleanup(state);
+            state.pngTex = textureCreateCustom(state.selectedSize.x, state.selectedSize.y, { RepeatType_CLAMP, FilterType_NEAREST });
+            state.ega = egaTextureCreate(state.selectedSize.x, state.selectedSize.y);
+            egaClearAlpha(state.ega);
+
+            ImGui::CloseCurrentPopup();
+         }
+
+
+         ImGui::EndPopup();
+      }
       
    }
    if (ImGui::CollapsingHeader("Encoding", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -136,14 +165,7 @@ static void _doToolbar(Window* wnd, EncoderState &state) {
       }
 
       if (btnClose) {
-         if (state.pngTex) {
-            textureDestroy(state.pngTex);
-            state.pngTex = nullptr;
-         }
-         if (state.ega) {
-            egaTextureDestroy(state.ega);
-            state.ega = nullptr;
-         }
+         _stateTexCleanup(state);
       } 
 
       if (encode && state.pngTex) {
@@ -190,11 +212,8 @@ bool _doUI(Window* wnd, EncoderState &state) {
 
    ImGui::SetNextWindowSize(ImVec2(800, 800), ImGuiCond_Appearing);
    if (ImGui::Begin(state.winName.c_str(), &p_open, 0)) {
-      //ImGui::Columns(2, 0, false);
-      //ImGui::SetColumnWidth(0, uiPaletteEditorWidth() + imStyle.WindowPadding.x * 2);
-
       auto sz = ImGui::GetContentRegionAvail();
-      if (ImGui::BeginChild("Toolbar", ImVec2(uiPaletteEditorWidth() + imStyle.WindowPadding.x * 2, sz.y))) {
+      if (ImGui::BeginChild("Toolbar", ImVec2(uiPaletteEditorWidth() + imStyle.IndentSpacing + imStyle.WindowPadding.x * 2, sz.y))) {
          _doToolbar(wnd, state);
       }
       ImGui::EndChild();
@@ -237,14 +256,18 @@ bool _doUI(Window* wnd, EncoderState &state) {
 
             auto bgCol = ImGui::GetColorU32(state.bgColor);
 
-            ImGui::RenderColorRectWithAlphaCheckerboard(a, b, bgCol, 10 * state.zoomLevel, ImVec2());
-            draw_list->PopClipRect();
-            //draw_list->AddRectFilled(a, b, IM_COL32_BLACK_TRANS);
+            // this is a bit of a silly check.. imgui doesnt let us exceed custom draw calls past a certain point so 10k+
+            // draw calls from this alpha grid is bad juju so imma try and limit it here
+            auto pxSize = state.selectedSize.x * state.selectedSize.y;
+            float checkerGridSize = 10;
+            if (pxSize / (checkerGridSize * checkerGridSize) > 0xFFF) {
+               checkerGridSize = sqrtf(pxSize / 0xFFF);
+            }
 
+            ImGui::RenderColorRectWithAlphaCheckerboard(a, b, bgCol, checkerGridSize * state.zoomLevel, ImVec2());
+            draw_list->PopClipRect();
             
             auto sz = ImVec2(drawSize.x*state.zoomLevel, drawSize.y*state.zoomLevel);
-            //ImGui::Image((ImTextureID)textureGetHandle(state.pngTex), sz);
-
             ImGui::InvisibleButton("##dummy", csz);
             if (ImGui::BeginDragDropTarget()) {
 
@@ -303,7 +326,6 @@ bool _doUI(Window* wnd, EncoderState &state) {
                ImGui::Text("");
             }
 
-
             ImGui::Text(ICON_FA_SEARCH); ImGui::SameLine(statsCol); 
             ImGui::Text("Scale: %.1f%%",state.zoomLevel * 100.0f); //ImGui::SameLine();
 
@@ -314,7 +336,6 @@ bool _doUI(Window* wnd, EncoderState &state) {
       }
       ImGui::EndChild();
 
-      //ImGui::Columns(1);
    }
    ImGui::End();
 
