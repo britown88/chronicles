@@ -802,7 +802,7 @@ void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSiz
       // popout button
       if (!(flags&PaletteEditorFlags_POPPED_OUT)) {
          ImGui::SameLine();
-         auto btnPopOut = ImGui::Button(ICON_FA_SIGN_OUT_ALT);
+         auto btnPopOut = ImGui::Button(ICON_FA_EXTERNAL_LINK_ALT);
          if (ImGui::IsItemHovered()) ImGui::SetTooltip("Pop Out");
          if (btnPopOut) {
             auto label = format("Palette Editor##%p%p%d", pal, palName, palNameSize);

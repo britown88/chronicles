@@ -51,11 +51,19 @@ static void _loadPNG(EncoderState &state) {
    }
 }
 
+static void _doToolbar(EncoderState &state) {
+   bool btnPencil = ImGui::Button(ICON_FA_PENCIL_ALT); ImGui::SameLine();   
+   bool btnErase = ImGui::Button(ICON_FA_ERASER); ImGui::SameLine();
+   bool btnFill = ImGui::Button(ICON_FA_PAINT_BRUSH); ImGui::SameLine();
+   bool btnRegion = ImGui::Button(ICON_FA_EXPAND); ImGui::SameLine();
+   bool btnCrop = ImGui::Button(ICON_FA_CROP); ImGui::SameLine();
+   bool btnRect = ImGui::Button(ICON_FA_SQUARE);
+
+}
+
 bool _doUI(Window* wnd, EncoderState &state) {
    auto game = gameGet();
    bool p_open = true;
-
-   
 
    ImGui::SetNextWindowSize(ImVec2(500, 800), ImGuiCond_Appearing);
    if (ImGui::Begin("EGA Encoder", &p_open, ImGuiWindowFlags_MenuBar)) {
@@ -90,6 +98,10 @@ bool _doUI(Window* wnd, EncoderState &state) {
       if (ImGui::IsWindowAppearing()) {
          _loadPNG(state);
       }
+
+      // now for the toolbar!
+
+      _doToolbar(state);
 
       auto sz = ImGui::GetContentRegionAvail();
       auto palHeight = uiPaletteEditorHeight();
@@ -189,35 +201,25 @@ bool _doUI(Window* wnd, EncoderState &state) {
             auto &imStyle = ImGui::GetStyle();
             static float statsCol = 32.0f;
 
-            ImGui::SetCursorPos(imStyle.WindowPadding);
-            ImGui::Text(ICON_FA_SEARCH); ImGui::SameLine(statsCol); 
-            ImGui::Text("Scale: %.1f%%",state.zoomLevel * 100.0f); ImGui::SameLine();
-            //if (ImGui::Button("Reset")) {
-            //   state.zoomOffset = { 0,0 };
-            //   state.zoomLevel = 0.f;
-            //}
-            //
-
+            ImGui::SetCursorPos(ImVec2(imStyle.WindowPadding.x, imStyle.WindowPadding.y + csz.y - ImGui::GetTextLineHeight() * 2 - imStyle.WindowPadding.y));
             if (mouseInImage) {    
                ImGui::Text(ICON_FA_MOUSE_POINTER); ImGui::SameLine(statsCol);
                ImGui::Text("Mouse: (%.1f, %.1f)", mouseX, mouseY);
-
-               if (state.ega) {
-                  auto c = egaTextureGetColorAt(state.ega, (u32)mouseX, (u32)mouseY);
-                  if (c < EGA_COLOR_UNDEFINED) {
-                     ImGui::Text(ICON_FA_PAINT_BRUSH); ImGui::SameLine(statsCol);
-                     ImGui::Text("Color: %d (Palette %d)", state.encPal.colors[c], c);
-                  }
-               }
             }
+            else {
+               ImGui::Text("");
+            }
+
+
+            ImGui::Text(ICON_FA_SEARCH); ImGui::SameLine(statsCol); 
+            ImGui::Text("Scale: %.1f%%",state.zoomLevel * 100.0f); //ImGui::SameLine();
 
             if (state.ega) {
                uiPaletteColorPicker("egapicker", &state.encPal.colors[state.clickedColor]);
             }
          }
-
-         ImGui::EndChild();
       }
+      ImGui::EndChild();
       
       auto &imStyle = ImGui::GetStyle();
 
