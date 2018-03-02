@@ -644,42 +644,6 @@ void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSiz
 
       ImGui::SameLine();
 
-      // save button
-      auto currentNameLen = strlen(palName);
-      bool nameValid = currentNameLen != 0;
-
-      if (!nameValid) {
-         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha*0.5f);
-      }
-      
-      bool palExists = paletteExists(game->assets.palettes, palName);
-      auto btnSave = ImGui::Button(ICON_FA_DOWNLOAD);
-
-      static StringView ttip_save = "Save";
-      static StringView ttip_saveinvalid = "Save (File name can't be empty)";
-      if (ImGui::IsItemHovered()) ImGui::SetTooltip(nameValid ? ttip_save : ttip_saveinvalid);
-
-      if (btnSave && nameValid) {
-         if (palExists) {
-            ImGui::OpenPopup("Save Confirm");
-         }
-         else {
-            paletteSave(game->assets.palettes, palName, pal);
-            ImGui::OpenPopup("Saved");
-         }
-      }
-      if (uiModalPopup("Save Confirm", "Palette Exists\nOverwrite?", uiModalTypes_YESNO, ICON_FA_EXCLAMATION) == uiModalResults_YES) {
-         paletteSave(game->assets.palettes, palName, pal);
-         ImGui::OpenPopup("Saved");
-      }
-      uiModalPopup("Saved", "Palette Saved!", uiModalTypes_OK, ICON_FA_CHECK);
-      
-      if (!nameValid) {
-         ImGui::PopStyleVar();
-      }
-
-      ImGui::SameLine();
-
       // load button
       auto btnLoad = ImGui::Button(ICON_FA_UPLOAD);
       if (ImGui::IsItemHovered()) ImGui::SetTooltip("Load");
@@ -780,6 +744,43 @@ void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSiz
             paletteLoad(game->assets.palettes, palName, pal);
          }
       }
+
+      ImGui::SameLine();
+
+      // save button
+      auto currentNameLen = strlen(palName);
+      bool nameValid = currentNameLen != 0;
+
+      if (!nameValid) {
+         ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha*0.5f);
+      }
+
+      bool palExists = paletteExists(game->assets.palettes, palName);
+      auto btnSave = ImGui::Button(ICON_FA_DOWNLOAD);
+
+      static StringView ttip_save = "Save";
+      static StringView ttip_saveinvalid = "Save (File name can't be empty)";
+      if (ImGui::IsItemHovered()) ImGui::SetTooltip(nameValid ? ttip_save : ttip_saveinvalid);
+
+      if (btnSave && nameValid) {
+         if (palExists) {
+            ImGui::OpenPopup("Save Confirm");
+         }
+         else {
+            paletteSave(game->assets.palettes, palName, pal);
+            ImGui::OpenPopup("Saved");
+         }
+      }
+      if (uiModalPopup("Save Confirm", "Palette Exists\nOverwrite?", uiModalTypes_YESNO, ICON_FA_EXCLAMATION) == uiModalResults_YES) {
+         paletteSave(game->assets.palettes, palName, pal);
+         ImGui::OpenPopup("Saved");
+      }
+      uiModalPopup("Saved", "Palette Saved!", uiModalTypes_OK, ICON_FA_CHECK);
+
+      if (!nameValid) {
+         ImGui::PopStyleVar();
+      }
+
       ImGui::SameLine();
 
       // refresh button

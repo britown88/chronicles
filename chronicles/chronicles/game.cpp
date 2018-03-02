@@ -5,7 +5,6 @@
 #include "ega.h"
 #include "chronwin.h"
 #include "scf.h"
-
 #include <unordered_map>
 
 static const StringView PalettePath = "pal.bin";
@@ -119,6 +118,7 @@ static void _gameDataInit(GameData* game) {
 
    game->assets.palettes = new PaletteManager();
    _loadPalettes(game->assets.palettes);
+   
 }
 
 

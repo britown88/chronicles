@@ -25,6 +25,7 @@ struct EncoderState {
    ImVec4 bgColor;
 
    std::string winName;
+   Int2 selectedSize = { 0 };
 };
 
 static std::string _getPng() {
@@ -50,35 +51,81 @@ static void _loadPNG(EncoderState &state) {
 
       auto palName = pathGetFilename(png.c_str());
       strcpy(state.palName, palName.c_str());
+
+      state.selectedSize = textureGetSize(state.pngTex);
    }
 }
 
 static void _doToolbar(Window* wnd, EncoderState &state) {
-   ImGui::BeginGroup();
+   auto &imStyle = ImGui::GetStyle();
 
    if (ImGui::CollapsingHeader("Palette", ImGuiTreeNodeFlags_DefaultOpen)) {
-      uiPaletteEditor(wnd, &state.encPal, state.palName, 64, PaletteEditorFlags_ENCODE);
+      uiPaletteEditor(wnd, &state.encPal, state.palName, 64, state.ega ? 0 : PaletteEditorFlags_ENCODE);
    }
-   if (ImGui::CollapsingHeader("Tools", ImGuiTreeNodeFlags_DefaultOpen)) {
-      bool btnPencil = ImGui::Button(ICON_FA_PENCIL_ALT); ImGui::SameLine();
-      bool btnErase = ImGui::Button(ICON_FA_ERASER); ImGui::SameLine();
-      bool btnFill = ImGui::Button(ICON_FA_PAINT_BRUSH); ImGui::SameLine();
+   if (ImGui::CollapsingHeader("Image", ImGuiTreeNodeFlags_DefaultOpen)) {
 
-      ImGui::NewLine();
+      ImGui::Indent();
 
-      bool btnRegion = ImGui::Button(ICON_FA_EXPAND); ImGui::SameLine();
-      bool btnCrop = ImGui::Button(ICON_FA_CROP); ImGui::SameLine();
-      bool btnRect = ImGui::Button(ICON_FA_SQUARE);
+      bool btnNew = ImGui::Button(ICON_FA_FILE " New"); ImGui::SameLine();
+      bool btnLoad = ImGui::Button(ICON_FA_UPLOAD " Load"); ImGui::SameLine();
+
+      if (!state.ega) { ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.5f); }
+
+      bool btnSave = ImGui::Button(ICON_FA_DOWNLOAD " Save");       
+
+      ImGui::Separator();
+
+      ImGui::BeginGroup();
+      bool btnPencil = ImGui::Button(ICON_FA_PENCIL_ALT " Pencil");
+      bool btnErase = ImGui::Button(ICON_FA_ERASER " Eraser");
+      bool btnFill = ImGui::Button(ICON_FA_PAINT_BRUSH " Flood Fill");
+      ImGui::EndGroup();
+      ImGui::SameLine();
+      ImGui::BeginGroup();
+      bool btnRect = ImGui::Button(ICON_FA_SQUARE " Draw Rect");
+      bool btnRegion = ImGui::Button(ICON_FA_EXPAND " Region Select");
+      bool btnCrop = ImGui::Button(ICON_FA_CROP " Crop");
+      ImGui::EndGroup();
+
+      ImGui::Separator();
+
+      float spd = state.ega ? 1.0f : 0.0f;
+      i32 size[2] = { 0 };
+      memcpy(size, &state.selectedSize, sizeof(i32) * 2);
+      ImGui::DragInt2("Size", size, spd, 0, 0);
+      if (memcmp(size, &state.selectedSize, sizeof(i32) * 2)) {
+         if (state.pngTex) {
+            // change happened, resize
+            //memcpy(state.selectedSize, size, sizeof(int) * 2);
+         }
+      }
+
+      if (!state.ega) { ImGui::PopStyleVar(); }
+
+      ImGui::Unindent();
+      
    }
    if (ImGui::CollapsingHeader("Encoding", ImGuiTreeNodeFlags_DefaultOpen)) {
 
       ImGui::Indent();
+
+      ImGui::BeginGroup();
       bool btnOpen = ImGui::Button(ICON_FA_FOLDER_OPEN " Load PNG"); 
 
       if (!state.pngTex) { ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.5f); }
 
       bool btnClose = ImGui::Button(ICON_FA_TRASH_ALT " Close Texture");
-      bool encode = ImGui::Button(ICON_FA_IMAGE " Encode!");
+
+      ImGui::EndGroup();
+      ImGui::SameLine();
+      ImGui::BeginGroup();
+
+      auto encodeBtnSize = ImVec2(
+         0, 
+         ImGui::GetFrameHeight() * 2 + imStyle.ItemSpacing.y);
+
+      bool encode = ImGui::Button(ICON_FA_IMAGE " Encode!", encodeBtnSize);
+      ImGui::EndGroup();
 
       if (!state.pngTex) { ImGui::PopStyleVar(); }
 
@@ -87,8 +134,6 @@ static void _doToolbar(Window* wnd, EncoderState &state) {
       if (btnOpen) {
          _loadPNG(state);
       }
-
-      
 
       if (btnClose) {
          if (state.pngTex) {
@@ -136,10 +181,6 @@ static void _doToolbar(Window* wnd, EncoderState &state) {
 
       ImGui::Unindent();
    }
-
-   
-
-   ImGui::EndGroup();
 }
 
 bool _doUI(Window* wnd, EncoderState &state) {
@@ -149,21 +190,17 @@ bool _doUI(Window* wnd, EncoderState &state) {
 
    ImGui::SetNextWindowSize(ImVec2(800, 800), ImGuiCond_Appearing);
    if (ImGui::Begin(state.winName.c_str(), &p_open, 0)) {
-      ImGui::Columns(2, 0, false);
-      ImGui::SetColumnWidth(0, uiPaletteEditorWidth() + imStyle.WindowPadding.x * 2);
-
-
-      _doToolbar(wnd, state);
-
-      ImGui::NextColumn();
+      //ImGui::Columns(2, 0, false);
+      //ImGui::SetColumnWidth(0, uiPaletteEditorWidth() + imStyle.WindowPadding.x * 2);
 
       auto sz = ImGui::GetContentRegionAvail();
-      auto palHeight = uiPaletteEditorHeight();
+      if (ImGui::BeginChild("Toolbar", ImVec2(uiPaletteEditorWidth() + imStyle.WindowPadding.x * 2, sz.y))) {
+         _doToolbar(wnd, state);
+      }
+      ImGui::EndChild();
 
-      auto y = ImGui::GetCursorPosY();
-
-      
-
+      ImGui::SameLine();
+      sz = ImGui::GetContentRegionAvail();
       if (ImGui::BeginChild("DrawArea", sz, true, ImGuiWindowFlags_NoScrollWithMouse)) {
          if (state.pngTex) {
             auto csz = ImGui::GetContentRegionAvail();
@@ -277,7 +314,7 @@ bool _doUI(Window* wnd, EncoderState &state) {
       }
       ImGui::EndChild();
 
-      ImGui::Columns(1);
+      //ImGui::Columns(1);
    }
    ImGui::End();
 
