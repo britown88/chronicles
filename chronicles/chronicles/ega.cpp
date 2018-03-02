@@ -390,6 +390,10 @@ EGATexture *egaTextureCreateFromTextureEncode(Texture *source, EGAPalette *targe
       }
    }
 
+   if (!totalCount) {
+      return nullptr;
+   }
+
    std::list<PaletteColor> palette;
    ImageColor colors[64];
    for (int i = 0; i < 64; ++i)

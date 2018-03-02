@@ -23,6 +23,8 @@ struct EncoderState {
 
    bool egaStretch = false;
    ImVec4 bgColor;
+
+   std::string winName;
 };
 
 static std::string _getPng() {
@@ -51,64 +53,118 @@ static void _loadPNG(EncoderState &state) {
    }
 }
 
-static void _doToolbar(EncoderState &state) {
-   bool btnPencil = ImGui::Button(ICON_FA_PENCIL_ALT); ImGui::SameLine();   
-   bool btnErase = ImGui::Button(ICON_FA_ERASER); ImGui::SameLine();
-   bool btnFill = ImGui::Button(ICON_FA_PAINT_BRUSH); ImGui::SameLine();
-   bool btnRegion = ImGui::Button(ICON_FA_EXPAND); ImGui::SameLine();
-   bool btnCrop = ImGui::Button(ICON_FA_CROP); ImGui::SameLine();
-   bool btnRect = ImGui::Button(ICON_FA_SQUARE);
+static void _doToolbar(Window* wnd, EncoderState &state) {
+   ImGui::BeginGroup();
 
+   if (ImGui::CollapsingHeader("Palette", ImGuiTreeNodeFlags_DefaultOpen)) {
+      uiPaletteEditor(wnd, &state.encPal, state.palName, 64, PaletteEditorFlags_ENCODE);
+   }
+   if (ImGui::CollapsingHeader("Tools", ImGuiTreeNodeFlags_DefaultOpen)) {
+      bool btnPencil = ImGui::Button(ICON_FA_PENCIL_ALT); ImGui::SameLine();
+      bool btnErase = ImGui::Button(ICON_FA_ERASER); ImGui::SameLine();
+      bool btnFill = ImGui::Button(ICON_FA_PAINT_BRUSH); ImGui::SameLine();
+
+      ImGui::NewLine();
+
+      bool btnRegion = ImGui::Button(ICON_FA_EXPAND); ImGui::SameLine();
+      bool btnCrop = ImGui::Button(ICON_FA_CROP); ImGui::SameLine();
+      bool btnRect = ImGui::Button(ICON_FA_SQUARE);
+   }
+   if (ImGui::CollapsingHeader("Encoding", ImGuiTreeNodeFlags_DefaultOpen)) {
+
+      ImGui::Indent();
+      bool btnOpen = ImGui::Button(ICON_FA_FOLDER_OPEN " Load PNG"); 
+
+      if (!state.pngTex) { ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.5f); }
+
+      bool btnClose = ImGui::Button(ICON_FA_TRASH_ALT " Close Texture");
+      bool encode = ImGui::Button(ICON_FA_IMAGE " Encode!");
+
+      if (!state.pngTex) { ImGui::PopStyleVar(); }
+
+      ImGui::Unindent();
+
+      if (btnOpen) {
+         _loadPNG(state);
+      }
+
+      
+
+      if (btnClose) {
+         if (state.pngTex) {
+            textureDestroy(state.pngTex);
+            state.pngTex = nullptr;
+         }
+         if (state.ega) {
+            egaTextureDestroy(state.ega);
+            state.ega = nullptr;
+         }
+      } 
+
+      if (encode && state.pngTex) {
+         if (state.ega) {
+            egaTextureDestroy(state.ega);
+         }
+
+         EGAPalette resultPal = { 0 };
+
+         if (auto decoded = egaTextureCreateFromTextureEncode(state.pngTex, &state.encPal, &resultPal)) {
+            state.ega = decoded;
+            state.encPal = resultPal;
+
+            egaTextureDecode(state.ega, state.pngTex, &state.encPal);
+
+         }
+         else {
+            ImGui::OpenPopup("Encode Failed!");
+         }
+      }
+      uiModalPopup("Encode Failed!", "Failed to finish encoding... does your palette have at least one color in it?");
+   }
+   if (ImGui::CollapsingHeader("Options", ImGuiTreeNodeFlags_DefaultOpen)) {
+
+      ImGui::Indent();
+
+      ImGui::Checkbox("EGA Stretch", &state.egaStretch);
+
+      ImGui::ColorEdit4("Background Color", (float*)&state.bgColor,
+         ImGuiColorEditFlags_NoInputs |
+         ImGuiColorEditFlags_AlphaPreview | 
+         ImGuiColorEditFlags_HSV |
+         ImGuiColorEditFlags_AlphaBar |
+         ImGuiColorEditFlags_PickerHueBar);
+
+      ImGui::Unindent();
+   }
+
+   
+
+   ImGui::EndGroup();
 }
 
 bool _doUI(Window* wnd, EncoderState &state) {
    auto game = gameGet();
+   auto &imStyle = ImGui::GetStyle();
    bool p_open = true;
 
-   ImGui::SetNextWindowSize(ImVec2(500, 800), ImGuiCond_Appearing);
-   if (ImGui::Begin("EGA Encoder", &p_open, ImGuiWindowFlags_MenuBar)) {
-      if (ImGui::BeginMenuBar()) {
+   ImGui::SetNextWindowSize(ImVec2(800, 800), ImGuiCond_Appearing);
+   if (ImGui::Begin(state.winName.c_str(), &p_open, 0)) {
+      ImGui::Columns(2, 0, false);
+      ImGui::SetColumnWidth(0, uiPaletteEditorWidth() + imStyle.WindowPadding.x * 2);
 
-         if (ImGui::BeginMenu("File")) {
 
-            if (ImGui::MenuItem(ICON_FA_FOLDER_OPEN " Load PNG")) {
-               _loadPNG(state);
-            }
+      _doToolbar(wnd, state);
 
-            if (state.pngTex) {
-               if (ImGui::MenuItem(ICON_FA_TRASH_ALT " Close Texture")) {
-                  if (state.pngTex) {
-                     textureDestroy(state.pngTex);
-                     state.pngTex = nullptr;
-                  }
-
-                  if (state.ega) {
-                     egaTextureDestroy(state.ega);
-                     state.ega = nullptr;
-                  }
-               }
-            }
-
-            ImGui::EndMenu();
-         }
-
-         ImGui::EndMenuBar();
-      }
-
-      if (ImGui::IsWindowAppearing()) {
-         _loadPNG(state);
-      }
-
-      // now for the toolbar!
-
-      _doToolbar(state);
+      ImGui::NextColumn();
 
       auto sz = ImGui::GetContentRegionAvail();
       auto palHeight = uiPaletteEditorHeight();
 
       auto y = ImGui::GetCursorPosY();
 
-      if (ImGui::BeginChild("DrawArea", ImVec2(sz.x, sz.y - palHeight), true, ImGuiWindowFlags_NoScrollWithMouse)) {
+      
+
+      if (ImGui::BeginChild("DrawArea", sz, true, ImGuiWindowFlags_NoScrollWithMouse)) {
          if (state.pngTex) {
             auto csz = ImGui::GetContentRegionAvail();
             auto texSize = textureGetSize(state.pngTex);
@@ -220,55 +276,32 @@ bool _doUI(Window* wnd, EncoderState &state) {
          }
       }
       ImGui::EndChild();
-      
-      auto &imStyle = ImGui::GetStyle();
 
-      ImGui::SetCursorPosY(y + sz.y - palHeight);
-      uiPaletteEditor(wnd, &state.encPal, state.palName, 64, PaletteEditorFlags_ENCODE);
-
-      if (state.pngTex) {
-         ImGui::SameLine(uiPaletteEditorWidth() + imStyle.ItemSpacing.x * 2);
-         if (ImGui::Button("Encode!", ImVec2(palHeight, palHeight))) {
-            if (state.ega) {
-               egaTextureDestroy(state.ega);
-            }
-
-            EGAPalette resultPal = { 0 };
-            state.ega = egaTextureCreateFromTextureEncode(state.pngTex, &state.encPal, &resultPal);
-            state.encPal = resultPal;
-
-            egaTextureDecode(state.ega, state.pngTex, &state.encPal);
-         }
-      }
-
-      ImGui::SameLine();
-      ImGui::BeginGroup();
-
-      ImGui::Text("Options");
-      ImGui::Checkbox("EGA Stretch", &state.egaStretch);
-
-      ImGui::ColorEdit4("BG", (float*)&state.bgColor,
-         ImGuiColorEditFlags_NoInputs |
-         ImGuiColorEditFlags_AlphaPreview | 
-         ImGuiColorEditFlags_HSV |
-         ImGuiColorEditFlags_AlphaBar |
-         ImGuiColorEditFlags_PickerHueBar);
-
-      ImGui::EndGroup();      
+      ImGui::Columns(1);
    }
    ImGui::End();
 
    return p_open;
 }
 
-void uiToolStartEGAEncoder( Window* wnd) {
+static std::string _genWinTitle(EncoderState *state) {
+   return format("%s EGAPaint###EGAPaint%p", ICON_FA_PAINT_BRUSH, state);
+}
+
+void uiToolStartEGAPaint( Window* wnd) {
    auto game = gameGet();
-   EncoderState state;
+   EncoderState *state = new EncoderState();
 
-   strcpy(state.palName, "default");
-   paletteLoad(game->assets.palettes, state.palName, &state.encPal);
+   strcpy(state->palName, "default");
+   paletteLoad(game->assets.palettes, state->palName, &state->encPal);
 
-   windowAddGUI(wnd, "EGA Encoder", [=](Window*wnd) mutable {
-      return _doUI(wnd, state);
+   state->winName = _genWinTitle(state);
+
+   windowAddGUI(wnd, state->winName.c_str(), [=](Window*wnd) mutable {
+      bool ret = _doUI(wnd, *state);
+      if (!ret) {
+         delete state;
+      }
+      return ret;
    });
 }

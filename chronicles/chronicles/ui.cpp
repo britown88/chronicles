@@ -233,7 +233,7 @@ static void _mainMenu( Window* wnd) {
    if (ImGui::BeginMainMenuBar()) {
       if (ImGui::BeginMenu("Debug")) {
 
-         ImGui::ColorEdit3("Clear Color", (float*)&game->imgui.bgClearColor);
+         ImGui::ColorEdit4("Clear Color", (float*)&game->imgui.bgClearColor);
 
          if (ImGui::MenuItem("Dialog Stats")) {
             windowAddGUI(wnd, "DialogStats", [=](Window*wnd) {
@@ -304,8 +304,8 @@ static void _mainMenu( Window* wnd) {
       }
 
       if (ImGui::BeginMenu("Tools")) {
-         if (ImGui::MenuItem("EGA Encoder")) {
-            uiToolStartEGAEncoder(wnd);
+         if (ImGui::MenuItem(ICON_FA_PAINT_BRUSH" EGAPaint")) {
+            uiToolStartEGAPaint(wnd);
          }
 
          if (ImGui::MenuItem("Color Picker")) {
