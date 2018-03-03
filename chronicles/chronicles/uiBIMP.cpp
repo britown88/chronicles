@@ -13,7 +13,7 @@
 
 #define POPUPID_COLORPICKER "egapicker"
 
-struct EncoderState {
+struct BIMPState {
    Texture* pngTex = nullptr;
    EGATexture *ega = nullptr;
    EGAPalette encPal;
@@ -34,7 +34,7 @@ struct EncoderState {
    Int2 lastMouse = { 0 };
 };
 
-static void _stateTexCleanup(EncoderState &state) {
+static void _stateTexCleanup(BIMPState &state) {
    if (state.pngTex) {
       textureDestroy(state.pngTex);
       state.pngTex = nullptr;
@@ -55,7 +55,7 @@ static std::string _getPng() {
    return openFile(cfg);
 }
 
-static void _loadPNG(EncoderState &state) {
+static void _loadPNG(BIMPState &state) {
    auto png = _getPng();
    if (!png.empty()) {
       
@@ -69,7 +69,7 @@ static void _loadPNG(EncoderState &state) {
    }
 }
 
-static void _doToolbar(Window* wnd, EncoderState &state) {
+static void _doToolbar(Window* wnd, BIMPState &state) {
    auto &imStyle = ImGui::GetStyle();
 
    if (ImGui::CollapsingHeader("Palette", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -213,7 +213,7 @@ static void _doToolbar(Window* wnd, EncoderState &state) {
 
 // this function immediately follows the invisibile dummy button for the viewer
 // all handling of mouse/keyboard for interactions with the viewer should go here!
-static void _handleInput(EncoderState &state, Float2 pxSize, Float2 cursorPos) {
+static void _handleInput(BIMPState &state, Float2 pxSize, Float2 cursorPos) {
    auto &io = ImGui::GetIO();
 
    if (ImGui::BeginDragDropTarget()) {
@@ -272,7 +272,7 @@ static void _handleInput(EncoderState &state, Float2 pxSize, Float2 cursorPos) {
    }
 }
 
-static void _showStats(EncoderState &state, float viewHeight) {
+static void _showStats(BIMPState &state, float viewHeight) {
    auto &imStyle = ImGui::GetStyle();
 
    static float statsCol = 32.0f;
@@ -290,7 +290,7 @@ static void _showStats(EncoderState &state, float viewHeight) {
    ImGui::Text("Scale: %.1f%%", state.zoomLevel * 100.0f); //ImGui::SameLine();
 }
 
-bool _doUI(Window* wnd, EncoderState &state) {
+bool _doUI(Window* wnd, BIMPState &state) {
    auto game = gameGet();
    auto &imStyle = ImGui::GetStyle();
    bool p_open = true;
@@ -377,13 +377,13 @@ bool _doUI(Window* wnd, EncoderState &state) {
    return p_open;
 }
 
-static std::string _genWinTitle(EncoderState *state) {
-   return format("%s EGAPaint###EGAPaint%p", ICON_FA_PAINT_BRUSH, state);
+static std::string _genWinTitle(BIMPState *state) {
+   return format("%s BIMP - Brandon's Image Manipulation Program###BIMP%p", ICON_FA_PAINT_BRUSH, state);
 }
 
-void uiToolStartEGAPaint( Window* wnd) {
+void uiToolStartBIMP( Window* wnd) {
    auto game = gameGet();
-   EncoderState *state = new EncoderState();
+   BIMPState *state = new BIMPState();
 
    strcpy(state->palName, "default");
    paletteLoad(game->assets.palettes, state->palName, &state->encPal);

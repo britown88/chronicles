@@ -150,7 +150,7 @@ xcopy /y "$(sdl2)bin" "$(OutDir)"</Command>
     <ClCompile Include="stringformat.cpp" />
     <ClCompile Include="symbol.cpp" />
     <ClCompile Include="ui.cpp" />
-    <ClCompile Include="uiEGAEncoder.cpp" />
+    <ClCompile Include="uiBIMP.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\chronimgui\chronimgui.vcxproj">

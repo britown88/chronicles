@@ -51,10 +51,10 @@
     <ClCompile Include="scf.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="uiEGAEncoder.cpp">
+    <ClCompile Include="chronwin.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="chronwin.cpp">
+    <ClCompile Include="uiBIMP.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
