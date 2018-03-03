@@ -11,12 +11,17 @@
 
 #include "SDL2/SDL_scancode.h"
 
+#define POPUPID_COLORPICKER "egapicker"
+
 struct EncoderState {
    Texture* pngTex = nullptr;
    EGATexture *ega = nullptr;
    EGAPalette encPal;
    char palName[64];
-   EGAPColor clickedColor = 0;
+
+   EGAPColor popupCLickedColor = 0; // for color picker popup
+   Float2 mousePos = { 0 }; //mouse positon within the image coords (updated per frame)
+   bool mouseInImage = false; //helper boolean for every frame
 
    float zoomLevel = 1.0f;
    Int2 zoomOffset = {};
@@ -206,6 +211,85 @@ static void _doToolbar(Window* wnd, EncoderState &state) {
    }
 }
 
+// this function immediately follows the invisibile dummy button for the viewer
+// all handling of mouse/keyboard for interactions with the viewer should go here!
+static void _handleInput(EncoderState &state, Float2 pxSize, Float2 cursorPos) {
+   auto &io = ImGui::GetIO();
+
+   if (ImGui::BeginDragDropTarget()) {
+      if (auto payload = ImGui::AcceptDragDropPayload(UI_DRAGDROP_PALCOLOR)) {
+         if (state.ega && state.mouseInImage) {
+            auto c = egaTextureGetColorAt(state.ega, (u32)state.mousePos.x, (u32)state.mousePos.y);
+            if (c < EGA_COLOR_UNDEFINED) {
+               auto plData = (uiDragDropPalColor*)payload->Data;
+               state.encPal.colors[c] = plData->color;
+            }
+         }
+      }
+      ImGui::EndDragDropTarget();
+   }
+
+   if (ImGui::IsItemActive()) {
+      if (io.KeyCtrl && ImGui::IsMouseDragging()) {
+         state.zoomOffset.x += ImGui::GetIO().MouseDelta.x;
+         state.zoomOffset.y += ImGui::GetIO().MouseDelta.y;
+      }
+
+      ImGui::Begin("asddfasd");
+      ImGui::End();
+   }
+   if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenOverlapped)) {
+      if (io.KeyCtrl && fabs(io.MouseWheel) > 0.0f) {
+         auto zoom = state.zoomLevel;
+         state.zoomLevel = MIN(100, MAX(0.1f, state.zoomLevel + io.MouseWheel * 0.05f * state.zoomLevel));
+
+         state.zoomOffset.x = -(state.mousePos.x * state.zoomLevel * pxSize.x - (io.MousePos.x - cursorPos.x));
+         state.zoomOffset.y = -(state.mousePos.y * state.zoomLevel * pxSize.y - (io.MousePos.y - cursorPos.y));
+      }
+
+      if (ImGui::IsMouseDown(0)) {
+
+         if (state.ega) {
+            Int2 m = { (i32)state.mousePos.x, (i32)state.mousePos.y };
+            egaRenderLine(state.ega, state.lastMouse, m, 0);
+            state.lastMouse = m;
+            //egaRenderPoint(state.ega, { (i32)mouseX, (i32)mouseY }, 0);
+         }
+
+      }
+
+      if (state.mouseInImage) {
+         if (ImGui::IsMouseClicked(1)) {
+            if (state.ega) {
+               auto c = egaTextureGetColorAt(state.ega, (u32)state.mousePos.x, (u32)state.mousePos.y);
+               if (c < EGA_COLOR_UNDEFINED) {
+                  state.popupCLickedColor = c;
+                  ImGui::OpenPopup(POPUPID_COLORPICKER);
+               }
+            }
+         }
+      }
+   }
+}
+
+static void _showStats(EncoderState &state, float viewHeight) {
+   auto &imStyle = ImGui::GetStyle();
+
+   static float statsCol = 32.0f;
+   ImGui::SetCursorPos(ImVec2(imStyle.WindowPadding.x, imStyle.WindowPadding.y + viewHeight - ImGui::GetTextLineHeight() * 2 - imStyle.WindowPadding.y));
+
+   if (state.mouseInImage) {
+      ImGui::Text(ICON_FA_MOUSE_POINTER); ImGui::SameLine(statsCol);
+      ImGui::Text("Mouse: (%.1f, %.1f)", state.mousePos.x, state.mousePos.y);
+   }
+   else {
+      ImGui::Text("");
+   }
+
+   ImGui::Text(ICON_FA_SEARCH); ImGui::SameLine(statsCol);
+   ImGui::Text("Scale: %.1f%%", state.zoomLevel * 100.0f); //ImGui::SameLine();
+}
+
 bool _doUI(Window* wnd, EncoderState &state) {
    auto game = gameGet();
    auto &imStyle = ImGui::GetStyle();
@@ -213,17 +297,17 @@ bool _doUI(Window* wnd, EncoderState &state) {
 
    ImGui::SetNextWindowSize(ImVec2(800, 800), ImGuiCond_Appearing);
    if (ImGui::Begin(state.winName.c_str(), &p_open, 0)) {
-      auto sz = ImGui::GetContentRegionAvail();
-      if (ImGui::BeginChild("Toolbar", ImVec2(uiPaletteEditorWidth() + imStyle.IndentSpacing + imStyle.WindowPadding.x * 2, sz.y))) {
+      auto availSize = ImGui::GetContentRegionAvail();
+      if (ImGui::BeginChild("Toolbar", ImVec2(uiPaletteEditorWidth() + imStyle.IndentSpacing + imStyle.WindowPadding.x * 2, availSize.y))) {
          _doToolbar(wnd, state);
       }
       ImGui::EndChild();
 
       ImGui::SameLine();
-      sz = ImGui::GetContentRegionAvail();
-      if (ImGui::BeginChild("DrawArea", sz, true, ImGuiWindowFlags_NoScrollWithMouse)) {
+      availSize = ImGui::GetContentRegionAvail();
+      if (ImGui::BeginChild("DrawArea", availSize, true, ImGuiWindowFlags_NoScrollWithMouse)) {
          if (state.pngTex) {
-            auto csz = ImGui::GetContentRegionAvail();
+            auto viewSize = ImGui::GetContentRegionAvail();
             auto texSize = textureGetSize(state.pngTex);
             float pxWidth = 1.0f;
             float pxHeight = 1.0f;
@@ -235,115 +319,53 @@ bool _doUI(Window* wnd, EncoderState &state) {
 
             Float2 drawSize = { texSize.x * pxWidth, texSize.y * pxHeight };
 
-            ImDrawList* draw_list = ImGui::GetWindowDrawList();
-            const ImVec2 p = ImGui::GetCursorScreenPos();
-
-            if (state.ega) {
-               egaTextureDecode(state.ega, state.pngTex, &state.encPal);
-            }
-
-            auto &io = ImGui::GetIO();
-
-            auto a = ImVec2(state.zoomOffset.x + p.x, state.zoomOffset.y + p.y);
-            auto b = ImVec2(state.zoomOffset.x + p.x  + drawSize.x*state.zoomLevel, state.zoomOffset.y + p.y + drawSize.y*state.zoomLevel);
-
-            float mouseX = (io.MousePos.x - p.x - state.zoomOffset.x) / state.zoomLevel / pxWidth;
-            float mouseY = (io.MousePos.y - p.y - state.zoomOffset.y) / state.zoomLevel / pxHeight;
-
-            bool mouseInImage = mouseX > 0.0f && mouseX < texSize.x && mouseY > 0.0f && mouseY < texSize.y;
-            
-            draw_list->PushClipRect(a, b, true);
-            draw_list->AddRect(a, b, IM_COL32(0, 0, 0, 255));
-
-            auto bgCol = ImGui::GetColorU32(state.bgColor);
-
             // this is a bit of a silly check.. imgui doesnt let us exceed custom draw calls past a certain point so 10k+
             // draw calls from this alpha grid is bad juju so imma try and limit it here
-            auto pxSize = state.selectedSize.x * state.selectedSize.y;
+            auto pxSize = drawSize.x * drawSize.y;
             float checkerGridSize = 10;
             if (pxSize / (checkerGridSize * checkerGridSize) > 0xFFF) {
                checkerGridSize = sqrtf(pxSize / 0xFFF);
             }
 
-            ImGui::RenderColorRectWithAlphaCheckerboard(a, b, bgCol, checkerGridSize * state.zoomLevel, ImVec2());
+            ImDrawList* draw_list = ImGui::GetWindowDrawList();
+            const ImVec2 p = ImGui::GetCursorScreenPos();
+
+            // before anything we want to udpate png with the current ega texture
+            if (state.ega) {
+               egaTextureDecode(state.ega, state.pngTex, &state.encPal);
+            }
+
+            // drawlists use screen coords
+            auto a = ImVec2(state.zoomOffset.x + p.x, state.zoomOffset.y + p.y);
+            auto b = ImVec2(state.zoomOffset.x + p.x  + drawSize.x*state.zoomLevel, state.zoomOffset.y + p.y + drawSize.y*state.zoomLevel);
+
+            // get mouse position within the iamge
+            auto &io = ImGui::GetIO();
+            state.mousePos.x = (io.MousePos.x - p.x - state.zoomOffset.x) / state.zoomLevel / pxWidth;
+            state.mousePos.y = (io.MousePos.y - p.y - state.zoomOffset.y) / state.zoomLevel / pxHeight;
+            state.mouseInImage = 
+               state.mousePos.x > 0.0f && state.mousePos.x < texSize.x && 
+               state.mousePos.y > 0.0f && state.mousePos.y < texSize.y;
+
+            //in our own clip rect we draw an alpha grid and a border            
+            draw_list->PushClipRect(a, b, true);
+            ImGui::RenderColorRectWithAlphaCheckerboard(a, b, ImGui::GetColorU32(state.bgColor), checkerGridSize * state.zoomLevel, ImVec2());
+            draw_list->AddRect(a, b, IM_COL32(0, 0, 0, 255));
             draw_list->PopClipRect();
-            
-            auto sz = ImVec2(drawSize.x*state.zoomLevel, drawSize.y*state.zoomLevel);
-            ImGui::InvisibleButton("##dummy", csz);
-            if (ImGui::BeginDragDropTarget()) {
 
-               if (auto payload = ImGui::AcceptDragDropPayload(UI_DRAGDROP_PALCOLOR)) {
-                  if (state.ega && mouseInImage) {
-                     auto c = egaTextureGetColorAt(state.ega, (u32)mouseX, (u32)mouseY);
-                     if (c < EGA_COLOR_UNDEFINED) {
-                        auto plData = (uiDragDropPalColor*)payload->Data;
-                        state.encPal.colors[c] = plData->color;
-                     }
-                  }
-               }
+            //make a view-sized dummy button for capturing input
+            ImGui::InvisibleButton("##dummy", viewSize);
+            _handleInput(state, { pxWidth, pxHeight }, {p.x, p.y});
 
-               ImGui::EndDragDropTarget();
-            }
-
-            if (ImGui::IsItemActive()){
-               if (io.KeyCtrl && ImGui::IsMouseDragging()) {
-                  state.zoomOffset.x += ImGui::GetIO().MouseDelta.x;
-                  state.zoomOffset.y += ImGui::GetIO().MouseDelta.y;
-               }
-            }
-            if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenOverlapped)) {
-               if (io.KeyCtrl && fabs(io.MouseWheel) > 0.0f) {
-                  auto zoom = state.zoomLevel;
-                  state.zoomLevel = MIN(100, MAX(0.1f, state.zoomLevel + io.MouseWheel * 0.05f * state.zoomLevel));
-
-                  state.zoomOffset.x = -(mouseX * state.zoomLevel * pxWidth - (io.MousePos.x - p.x));
-                  state.zoomOffset.y = -(mouseY * state.zoomLevel * pxHeight - (io.MousePos.y - p.y));
-               }
-
-               if (ImGui::IsMouseDown(0)) {
-                  if (state.ega) {
-                     Int2 m = { (i32)mouseX, (i32)mouseY };
-                     egaRenderLine(state.ega, state.lastMouse, m, 0);
-                     state.lastMouse = m;
-
-
-                     //egaRenderPoint(state.ega, { (i32)mouseX, (i32)mouseY }, 0);
-                  }
-
-               }
-
-               if (mouseInImage) {
-                  if (ImGui::IsMouseClicked(1)) {
-                     if (state.ega) {
-                        auto c = egaTextureGetColorAt(state.ega, (u32)mouseX, (u32)mouseY);
-                        if (c < EGA_COLOR_UNDEFINED) {
-                           state.clickedColor = c;
-                           ImGui::OpenPopup("egapicker");
-                        }
-                     }
-                  }
-               }
-            }
-
+            // Draw the actual image
             draw_list->AddImage((ImTextureID)textureGetHandle(state.pngTex), a, b);
 
-            auto &imStyle = ImGui::GetStyle();
-            static float statsCol = 32.0f;
+            // show stats in the lower left
+            _showStats(state, viewSize.y);
 
-            ImGui::SetCursorPos(ImVec2(imStyle.WindowPadding.x, imStyle.WindowPadding.y + csz.y - ImGui::GetTextLineHeight() * 2 - imStyle.WindowPadding.y));
-            if (mouseInImage) {    
-               ImGui::Text(ICON_FA_MOUSE_POINTER); ImGui::SameLine(statsCol);
-               ImGui::Text("Mouse: (%.1f, %.1f)", mouseX, mouseY);
-            }
-            else {
-               ImGui::Text("");
-            }
-
-            ImGui::Text(ICON_FA_SEARCH); ImGui::SameLine(statsCol); 
-            ImGui::Text("Scale: %.1f%%",state.zoomLevel * 100.0f); //ImGui::SameLine();
-
+            // the popup for colorpicker from pixel
             if (state.ega) {
-               uiPaletteColorPicker("egapicker", &state.encPal.colors[state.clickedColor]);
+               uiPaletteColorPicker(POPUPID_COLORPICKER, &state.encPal.colors[state.popupCLickedColor]);
             }
          }
       }
