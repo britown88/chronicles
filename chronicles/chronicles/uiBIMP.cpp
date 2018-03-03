@@ -32,7 +32,13 @@ struct BIMPState {
    std::string winName;
    Int2 selectedSize = { 0 };
    Int2 lastMouse = { 0 };
+
+   EGAColor useColors[2] = { 0, 1 };
 };
+
+static std::string _genWinTitle(BIMPState *state) {
+   return format("%s BIMP - Brandon's Image Manipulation Program###BIMP%p", ICON_FA_PAINT_BRUSH, state);
+}
 
 static void _stateTexCleanup(BIMPState &state) {
    if (state.pngTex) {
@@ -69,6 +75,37 @@ static void _loadPNG(BIMPState &state) {
    }
 }
 
+
+static void _colorButtonEGAStart(EGAColor c) {
+   auto egac = egaGetColor(c);
+   ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(egac.r, egac.g, egac.b, 255));
+   ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(egac.r, egac.g, egac.b, 128));
+   ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(egac.r, egac.g, egac.b, 255));
+}
+
+static void _colorButtonEGAEnd() {
+   ImGui::PopStyleColor(3);
+}
+
+static bool _doColorSelectButton(BIMPState &state, u32 idx) {
+   auto label = format("##select%d", idx);
+   _colorButtonEGAStart(state.encPal.colors[state.useColors[idx]]);
+   auto out = ImGui::Button(label.c_str(), ImVec2(32.0f, 32.0f));
+
+   if (ImGui::BeginDragDropTarget()) {
+      if (auto payload = ImGui::AcceptDragDropPayload(UI_DRAGDROP_PALCOLOR)) {
+         auto plData = (uiDragDropPalColor*)payload->Data;
+         if (plData->paletteIndex < EGA_PALETTE_COLORS) {
+            state.useColors[idx] = plData->paletteIndex;
+         }
+      }
+      ImGui::EndDragDropTarget();
+   }
+   _colorButtonEGAEnd();
+
+   return out;
+}
+
 static void _doToolbar(Window* wnd, BIMPState &state) {
    auto &imStyle = ImGui::GetStyle();
 
@@ -83,15 +120,22 @@ static void _doToolbar(Window* wnd, BIMPState &state) {
 
       bool btnNew = ImGui::Button(ICON_FA_FILE " New"); ImGui::SameLine();
       bool btnLoad = ImGui::Button(ICON_FA_UPLOAD " Load"); ImGui::SameLine();
-
       if (!state.ega) { ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.5f); }
-
       bool btnSave = ImGui::Button(ICON_FA_DOWNLOAD " Save");       
 
       ImGui::Separator();
 
+      for (u32 i = 0; i < 2; ++i) {
+         _doColorSelectButton(state, i);
+         ImGui::SameLine();
+      }
+
+      ImGui::NewLine();
+      ImGui::Separator();
+
       ImGui::BeginGroup();
-      bool btnPencil = ImGui::Button(ICON_FA_PENCIL_ALT " Pencil");
+
+      bool btnPencil = ImGui::Button(ICON_FA_PENCIL_ALT " Pencil###pen");
       bool btnErase = ImGui::Button(ICON_FA_ERASER " Eraser");
       bool btnFill = ImGui::Button(ICON_FA_PAINT_BRUSH " Flood Fill");
       ImGui::EndGroup();
@@ -251,7 +295,7 @@ static void _handleInput(BIMPState &state, Float2 pxSize, Float2 cursorPos) {
 
          if (state.ega) {
             Int2 m = { (i32)state.mousePos.x, (i32)state.mousePos.y };
-            egaRenderLine(state.ega, state.lastMouse, m, 0);
+            egaRenderLine(state.ega, state.lastMouse, m, state.useColors[0]);
             state.lastMouse = m;
             //egaRenderPoint(state.ega, { (i32)mouseX, (i32)mouseY }, 0);
          }
@@ -375,10 +419,6 @@ bool _doUI(Window* wnd, BIMPState &state) {
    ImGui::End();
 
    return p_open;
-}
-
-static std::string _genWinTitle(BIMPState *state) {
-   return format("%s BIMP - Brandon's Image Manipulation Program###BIMP%p", ICON_FA_PAINT_BRUSH, state);
 }
 
 void uiToolStartBIMP( Window* wnd) {
