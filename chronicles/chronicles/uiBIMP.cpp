@@ -33,7 +33,12 @@ struct BIMPState {
 
    Texture* pngTex = nullptr;
    EGATexture *ega = nullptr;
-   EGAPalette encPal;
+
+   // drawn over main view, transient elements
+   Texture* editTex = nullptr;
+   EGATexture *editEGA = nullptr;
+
+   EGAPalette palette;
    char palName[64];
 
    ToolStates toolState =  ToolStates_PENCIL;
@@ -70,6 +75,33 @@ static void _stateTexCleanup(BIMPState &state) {
       egaTextureDestroy(state.ega);
       state.ega = nullptr;
    }
+
+   if (state.editTex) {
+      textureDestroy(state.editTex);
+      state.editTex = nullptr;
+   }
+
+   if (state.editEGA) {
+      egaTextureDestroy(state.editEGA);
+      state.editEGA = nullptr;
+   }
+}
+
+static void _refreshEditTextures(BIMPState &state) {
+   if (state.editTex) {
+      textureDestroy(state.editTex);
+      state.editTex = nullptr;
+   }
+   if (state.editEGA) {
+      egaTextureDestroy(state.editEGA);
+      state.editEGA = nullptr;
+   }
+
+   auto sz = textureGetSize(state.pngTex);
+   state.editEGA = egaTextureCreate(sz.x, sz.y);
+   state.editTex = textureCreateCustom(sz.x, sz.y, { RepeatType_CLAMP, FilterType_NEAREST });
+
+   egaClearAlpha(state.editEGA);
 }
 
 static std::string _getPng() {
@@ -134,7 +166,7 @@ static void _colorButtonEGAEnd() {
 static bool _doColorSelectButton(BIMPState &state, u32 idx) {
    auto label = format("##select%d", idx);
    auto popLabel = format("%spopup", label.c_str());
-   _colorButtonEGAStart(state.encPal.colors[state.useColors[idx]]);
+   _colorButtonEGAStart(state.palette.colors[state.useColors[idx]]);
    auto out = ImGui::Button(label.c_str(), ImVec2(32.0f, 32.0f));
 
    
@@ -159,7 +191,7 @@ static bool _doColorSelectButton(BIMPState &state, u32 idx) {
 
       for (byte i = 0; i < 16; ++i) {
          ImGui::PushID(i);
-         _colorButtonEGAStart(state.encPal.colors[i]);
+         _colorButtonEGAStart(state.palette.colors[i]);
          if (ImGui::Button("", ImVec2(20,20))) {
             state.useColors[idx] = i;
             ImGui::CloseCurrentPopup();
@@ -182,7 +214,7 @@ static void _doToolbar(Window* wnd, BIMPState &state) {
 
    if (ImGui::CollapsingHeader("Palette", ImGuiTreeNodeFlags_DefaultOpen)) {
       ImGui::Indent();
-      uiPaletteEditor(wnd, &state.encPal, state.palName, 64, PaletteEditorFlags_ENCODE);
+      uiPaletteEditor(wnd, &state.palette, state.palName, 64, PaletteEditorFlags_ENCODE);
       ImGui::Unindent();
    }
    if (ImGui::CollapsingHeader("Image", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -261,6 +293,7 @@ static void _doToolbar(Window* wnd, BIMPState &state) {
             _stateTexCleanup(state);
             state.pngTex = textureCreateCustom(state.enteredSize.x, state.enteredSize.y, { RepeatType_CLAMP, FilterType_NEAREST });
             state.ega = egaTextureCreate(state.enteredSize.x, state.enteredSize.y);
+            _refreshEditTextures(state);
             egaClearAlpha(state.ega);
             _fitToWindow(state);
             ImGui::CloseCurrentPopup();
@@ -312,12 +345,12 @@ static void _doToolbar(Window* wnd, BIMPState &state) {
 
          EGAPalette resultPal = { 0 };
 
-         if (auto decoded = egaTextureCreateFromTextureEncode(state.pngTex, &state.encPal, &resultPal)) {
+         if (auto decoded = egaTextureCreateFromTextureEncode(state.pngTex, &state.palette, &resultPal)) {
             state.ega = decoded;
-            state.encPal = resultPal;
+            state.palette = resultPal;
+            _refreshEditTextures(state);
 
-            egaTextureDecode(state.ega, state.pngTex, &state.encPal);
-
+            egaTextureDecode(state.ega, state.pngTex, &state.palette);
          }
          else {
             ImGui::OpenPopup("Encode Failed!");
@@ -350,20 +383,32 @@ static void _doToolbar(Window* wnd, BIMPState &state) {
 
 static void _doToolMousePressed(BIMPState &state, Int2 mouse) {
    auto &io = ImGui::GetIO();
-   if (io.KeyShift) {
-      egaRenderLine(state.ega, state.lastPointPlaced, mouse, state.useColors[0]);
-      state.lastPointPlaced = mouse;
-      state.mouseDown = false;
+   switch (state.toolState) {
+   case ToolStates_PENCIL: {
+      if (io.KeyShift) {
+         egaRenderLine(state.ega, state.lastPointPlaced, mouse, state.useColors[0]);
+         state.lastPointPlaced = mouse;
+         state.mouseDown = false;
+      }
+      break; }
    }
+   
 }
 
 static void _doToolMouseReleased(BIMPState &state, Int2 mouse) {
-
+   switch (state.toolState) {
+   case ToolStates_PENCIL: {
+      break; }
+   }
 }
 
 static void _doToolMouseDown(BIMPState &state, Int2 mouse) {
-   egaRenderLine(state.ega, state.lastMouse, mouse, state.useColors[0]);
-   state.lastPointPlaced = mouse;
+   switch (state.toolState) {
+   case ToolStates_PENCIL: {
+      egaRenderLine(state.ega, state.lastMouse, mouse, state.useColors[0]);
+      state.lastPointPlaced = mouse;
+      break; }
+   }
 }
 
 // this function immediately follows the invisibile dummy button for the viewer
@@ -377,7 +422,7 @@ static void _handleInput(BIMPState &state, Float2 pxSize, Float2 cursorPos) {
             auto c = egaTextureGetColorAt(state.ega, (u32)state.mousePos.x, (u32)state.mousePos.y);
             if (c < EGA_COLOR_UNDEFINED) {
                auto plData = (uiDragDropPalColor*)payload->Data;
-               state.encPal.colors[c] = plData->color;
+               state.palette.colors[c] = plData->color;
             }
          }
       }
@@ -417,7 +462,7 @@ static void _handleInput(BIMPState &state, Float2 pxSize, Float2 cursorPos) {
    }
 
    // now we handle actual tool functions, which dont happen if we're holding ctrl
-   if (io.KeyCtrl) {
+   if (!state.ega || io.KeyCtrl) {
       state.mouseDown = false;
       return;
    }
@@ -546,7 +591,10 @@ bool _doUI(Window* wnd, BIMPState &state) {
 
             // before anything we want to udpate png with the current ega texture
             if (state.ega) {
-               egaTextureDecode(state.ega, state.pngTex, &state.encPal);
+               egaTextureDecode(state.ega, state.pngTex, &state.palette);
+            }
+            if (state.editEGA) {
+               egaTextureDecode(state.editEGA, state.editTex, &state.palette);
             }
 
             // drawlists use screen coords
@@ -573,6 +621,9 @@ bool _doUI(Window* wnd, BIMPState &state) {
 
             // Draw the actual image
             draw_list->AddImage((ImTextureID)textureGetHandle(state.pngTex), a, b);
+            if (state.editTex) {
+               draw_list->AddImage((ImTextureID)textureGetHandle(state.editTex), a, b);
+            }
 
             // some tools can use some custom rendering
             _doCustomToolRender(state, draw_list, p);
@@ -582,7 +633,7 @@ bool _doUI(Window* wnd, BIMPState &state) {
 
             // the popup for colorpicker from pixel
             if (state.ega) {
-               uiPaletteColorPicker(POPUPID_COLORPICKER, &state.encPal.colors[state.popupCLickedColor]);
+               uiPaletteColorPicker(POPUPID_COLORPICKER, &state.palette.colors[state.popupCLickedColor]);
             }
          }
       }
@@ -599,7 +650,7 @@ void uiToolStartBIMP( Window* wnd) {
    BIMPState *state = new BIMPState();
 
    strcpy(state->palName, "default");
-   paletteLoad(game->assets.palettes, state->palName, &state->encPal);
+   paletteLoad(game->assets.palettes, state->palName, &state->palette);
 
    state->winName = _genWinTitle(state);
 
