@@ -40,6 +40,8 @@ struct BIMPState {
    EGAPColor popupCLickedColor = 0; // for color picker popup
    Float2 mousePos = { 0 }; //mouse positon within the image coords (updated per frame)
    bool mouseInImage = false; //helper boolean for every frame
+   Int2 lastMouse = { 0 }; // mouse position of last frame
+   bool mouseDown = false; // only gets true when mouse clicking in a valid image
 
    float zoomLevel = 1.0f;
    Int2 zoomOffset = {};
@@ -48,13 +50,9 @@ struct BIMPState {
 
    bool egaStretch = false;
    ImVec4 bgColor;
-
-   std::string winName;
-   Int2 lastMouse = { 0 };
-
    EGAColor useColors[2] = { 0, 1 };
 
-
+   std::string winName;
 };
 
 static std::string _genWinTitle(BIMPState *state) {
@@ -351,9 +349,27 @@ static void _handleInput(BIMPState &state, Float2 pxSize, Float2 cursorPos) {
          state.zoomOffset.x += (i32)ImGui::GetIO().MouseDelta.x;
          state.zoomOffset.y += (i32)ImGui::GetIO().MouseDelta.y;
       }
-
-
    }
+
+   if (state.mouseInImage && ImGui::IsMouseClicked(MOUSE_LEFT)) {
+      ImGui::CaptureMouseFromApp();
+      state.mouseDown = true;
+      Int2 m = { (i32)state.mousePos.x, (i32)state.mousePos.y };
+      state.lastMouse = m;
+   }
+
+   if (ImGui::IsMouseReleased(MOUSE_LEFT) && state.mouseDown) {
+      state.mouseDown = false;
+      ImGui::CaptureMouseFromApp(false);
+   }
+
+   if (ImGui::IsMouseDown(MOUSE_LEFT) && state.mouseDown) {
+      Int2 m = { (i32)state.mousePos.x, (i32)state.mousePos.y };      
+      egaRenderLine(state.ega, state.lastMouse, m, state.useColors[0]);
+      state.lastMouse = m;
+   }
+
+   
 
    // hover actions
    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenOverlapped)) {
@@ -364,15 +380,6 @@ static void _handleInput(BIMPState &state, Float2 pxSize, Float2 cursorPos) {
          state.zoomLevel = MIN(100, MAX(0.1f, state.zoomLevel + io.MouseWheel * 0.05f * state.zoomLevel));
          state.zoomOffset.x = -(i32)(state.mousePos.x * state.zoomLevel * pxSize.x - (io.MousePos.x - cursorPos.x));
          state.zoomOffset.y = -(i32)(state.mousePos.y * state.zoomLevel * pxSize.y - (io.MousePos.y - cursorPos.y));
-      }
-
-      if (ImGui::IsMouseDown(MOUSE_LEFT)) {
-         if (state.ega) {
-            Int2 m = { (i32)state.mousePos.x, (i32)state.mousePos.y };
-            egaRenderLine(state.ega, state.lastMouse, m, state.useColors[0]);
-            state.lastMouse = m;
-            
-         }
       }
 
       if (state.mouseInImage) {

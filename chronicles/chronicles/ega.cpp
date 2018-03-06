@@ -714,6 +714,7 @@ void egaRenderLine(EGATexture *target, Int2 pos1, Int2 pos2, EGAPColor color, EG
 
    //len=0
    if (!dx && !dy) {
+      egaRenderPoint(target, pos1, color, vp);
       return;
    }
 

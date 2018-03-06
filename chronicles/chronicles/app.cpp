@@ -137,29 +137,45 @@ void appCreateWindow(App* app, WindowConfig const& info) {
 bool appRunning(App* app) { return app->running; }
 void appPollEvents(App* app) {
    SDL_Event event;
+   auto &io = ImGui::GetIO();
    while (SDL_PollEvent(&event))
    {
       ImGui_ImplSdlGL3_ProcessEvent(app->wnd, &event);
+
+      // handle non-imgui-handled mouse things here
+      if (!io.WantCaptureMouse) {
+         switch (event.type) {
+         case SDL_MOUSEBUTTONUP: {
+            break; }
+         case SDL_MOUSEBUTTONDOWN: {
+            break; }
+         case SDL_MOUSEMOTION: {
+            break; }
+         case SDL_MOUSEWHEEL: {
+            break; }
+         }
+      }
+
+      if (!io.WantCaptureKeyboard) {
+         switch (event.type) {
+         case SDL_KEYDOWN: {
+            break; }
+         case SDL_KEYUP: {
+            // switch (event.key.keysym.scancode) {
+            // }
+            break; }
+         case SDL_TEXTEDITING: {
+            break; }
+         case SDL_TEXTINPUT: {
+            break; }
+         }
+      }
 
       switch (event.type)
       {
       case SDL_QUIT: {
          app->running = false;
          break; }
-      case SDL_MOUSEBUTTONDOWN: {
-
-         break; }
-      case SDL_TEXTINPUT: {
-
-         break; }
-      case SDL_KEYDOWN:
-      case SDL_KEYUP: {
-         switch (event.key.keysym.scancode) {
-         //case SDL_SCANCODE_ESCAPE:
-         //   app->running = false;
-         //   break;
-         }
-         break;  }
       case SDL_WINDOWEVENT:
          switch (event.window.event) {
          case SDL_WINDOWEVENT_EXPOSED:
