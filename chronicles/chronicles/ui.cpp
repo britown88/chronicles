@@ -890,7 +890,7 @@ static void _showWindowedViewer(Window* wnd) {
 
       _renderViewerTexture(game->primaryView.texture, viewersz);   
 
-      if (_imWindowContextMenu("Viewer Context", 1)) {
+      if (_imWindowContextMenu("Viewer Context", MOUSE_RIGHT)) {
          if (ImGui::Selectable("Edit Size")) {
             windowAddGUI(wnd, "viewerContextResize", [&](Window*wnd) mutable {
                bool p_open = true;

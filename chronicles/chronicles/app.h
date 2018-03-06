@@ -7,6 +7,12 @@
 
 //fuck it we'll put all our app stuff here!
 
+// the imgui example maps these differently from SDL 
+// and imgui just uses numbers because omar is weird
+#define MOUSE_LEFT 0
+#define MOUSE_RIGHT 1
+#define MOUSE_MIDDLE 2
+
 // APP
 typedef struct App App;
 App* appCreate();

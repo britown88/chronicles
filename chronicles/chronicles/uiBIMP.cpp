@@ -9,7 +9,8 @@
 
 #include "imgui_internal.h" // for checkerboard
 
-#include "SDL2/SDL_scancode.h"
+#include <SDL2/SDL_scancode.h>
+#include <SDL2/SDL_mouse.h>
 
 #define MAX_IMG_DIM 0x100000
 
@@ -343,37 +344,39 @@ static void _handleInput(BIMPState &state, Float2 pxSize, Float2 cursorPos) {
       ImGui::EndDragDropTarget();
    }
 
+   // clicked actions
    if (ImGui::IsItemActive()) {
+      // ctrl+dragging move image
       if (io.KeyCtrl && ImGui::IsMouseDragging()) {
          state.zoomOffset.x += (i32)ImGui::GetIO().MouseDelta.x;
          state.zoomOffset.y += (i32)ImGui::GetIO().MouseDelta.y;
       }
 
-      ImGui::Begin("asddfasd");
-      ImGui::End();
+
    }
+
+   // hover actions
    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenOverlapped)) {
+
+      // ctrl+wheel zooming
       if (io.KeyCtrl && fabs(io.MouseWheel) > 0.0f) {
          auto zoom = state.zoomLevel;
          state.zoomLevel = MIN(100, MAX(0.1f, state.zoomLevel + io.MouseWheel * 0.05f * state.zoomLevel));
-
          state.zoomOffset.x = -(i32)(state.mousePos.x * state.zoomLevel * pxSize.x - (io.MousePos.x - cursorPos.x));
          state.zoomOffset.y = -(i32)(state.mousePos.y * state.zoomLevel * pxSize.y - (io.MousePos.y - cursorPos.y));
       }
 
-      if (ImGui::IsMouseDown(0)) {
-
+      if (ImGui::IsMouseDown(MOUSE_LEFT)) {
          if (state.ega) {
             Int2 m = { (i32)state.mousePos.x, (i32)state.mousePos.y };
             egaRenderLine(state.ega, state.lastMouse, m, state.useColors[0]);
             state.lastMouse = m;
-            //egaRenderPoint(state.ega, { (i32)mouseX, (i32)mouseY }, 0);
+            
          }
-
       }
 
       if (state.mouseInImage) {
-         if (ImGui::IsMouseClicked(1)) {
+         if (ImGui::IsMouseClicked(MOUSE_RIGHT)) {
             if (state.ega) {
                auto c = egaTextureGetColorAt(state.ega, (u32)state.mousePos.x, (u32)state.mousePos.y);
                if (c < EGA_COLOR_UNDEFINED) {

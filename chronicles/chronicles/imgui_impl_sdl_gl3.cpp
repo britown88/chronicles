@@ -186,9 +186,9 @@ bool ImGui_ImplSdlGL3_ProcessEvent(Window* wnd, SDL_Event* event)
         }
     case SDL_MOUSEBUTTONDOWN:
         {
-            if (event->button.button == SDL_BUTTON_LEFT) g_MousePressed[0] = true;
-            if (event->button.button == SDL_BUTTON_RIGHT) g_MousePressed[1] = true;
-            if (event->button.button == SDL_BUTTON_MIDDLE) g_MousePressed[2] = true;
+            if (event->button.button == SDL_BUTTON_LEFT) g_MousePressed[MOUSE_LEFT] = true;
+            if (event->button.button == SDL_BUTTON_RIGHT) g_MousePressed[MOUSE_RIGHT] = true;
+            if (event->button.button == SDL_BUTTON_MIDDLE) g_MousePressed[MOUSE_MIDDLE] = true;
             return true;
         }
     case SDL_TEXTINPUT:
