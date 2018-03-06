@@ -347,6 +347,18 @@ static void _doToolbar(Window* wnd, BIMPState &state) {
    }
 }
 
+static void _doToolMousePressed(BIMPState &state, Int2 mouse) {
+
+}
+
+static void _doToolMouseReleased(BIMPState &state, Int2 mouse) {
+
+}
+
+static void _doToolMouseDown(BIMPState &state, Int2 mouse) {
+   egaRenderLine(state.ega, state.lastMouse, mouse, state.useColors[0]);
+}
+
 // this function immediately follows the invisibile dummy button for the viewer
 // all handling of mouse/keyboard for interactions with the viewer should go here!
 static void _handleInput(BIMPState &state, Float2 pxSize, Float2 cursorPos) {
@@ -399,28 +411,51 @@ static void _handleInput(BIMPState &state, Float2 pxSize, Float2 cursorPos) {
 
    // now we handle actual tool functions, which dont happen if we're holding ctrl
    if (io.KeyCtrl) {
+      state.mouseDown = false;
       return;
    }
 
+   Int2 m = { (i32)state.mousePos.x, (i32)state.mousePos.y };
+
    if (state.mouseInImage && ImGui::IsMouseClicked(MOUSE_LEFT)) {
-      ImGui::CaptureMouseFromApp();
       state.mouseDown = true;
-      Int2 m = { (i32)state.mousePos.x, (i32)state.mousePos.y };
+      _doToolMousePressed(state, m);
       state.lastMouse = m;
    }
 
    if (ImGui::IsMouseReleased(MOUSE_LEFT) && state.mouseDown) {
       state.mouseDown = false;
-      ImGui::CaptureMouseFromApp(false);
+      _doToolMouseReleased(state, m);
    }
 
-   if (ImGui::IsMouseDown(MOUSE_LEFT) && state.mouseDown) {
-      Int2 m = { (i32)state.mousePos.x, (i32)state.mousePos.y };      
-      egaRenderLine(state.ega, state.lastMouse, m, state.useColors[0]);
+   if (ImGui::IsMouseDown(MOUSE_LEFT) && state.mouseDown) {  
+      _doToolMouseDown(state, m);
       state.lastMouse = m;
    }
+}
 
-   
+static void _doCustomToolRender(BIMPState &state, ImDrawList *draw_list, ImVec2 p) {
+   if (!state.ega) {
+      return;
+   }
+
+   auto &io = ImGui::GetIO();
+   auto mouseScreenPos = io.MousePos;
+
+   switch (state.toolState) {
+   case ToolStates_PENCIL: {
+      ImVec2 a = {
+         (i32)(state.mousePos.x) * state.zoomLevel + p.x + state.zoomOffset.x, 
+         (i32)(state.mousePos.y) * state.zoomLevel + p.y + state.zoomOffset.y };
+
+      ImVec2 b = {
+         (i32)(state.mousePos.x + 1) * state.zoomLevel + p.x + state.zoomOffset.x,
+         (i32)(state.mousePos.y + 1) * state.zoomLevel + p.y + state.zoomOffset.y };
+
+      draw_list->AddRect(a, b, IM_COL32(0, 0, 0, 255));
+      break; }
+      
+   }
 }
 
 static void _showStats(BIMPState &state, float viewHeight) {
@@ -512,6 +547,9 @@ bool _doUI(Window* wnd, BIMPState &state) {
 
             // Draw the actual image
             draw_list->AddImage((ImTextureID)textureGetHandle(state.pngTex), a, b);
+
+            // some tools can use some custom rendering
+            _doCustomToolRender(state, draw_list, p);
 
             // show stats in the lower left
             _showStats(state, viewSize.y);
