@@ -82,9 +82,26 @@ static std::string _getPng() {
 
 static void _fitToWindow(BIMPState &state) {
    auto texSize = textureGetSize(state.pngTex);
+   float pxWidth = 1.0f;
+   float pxHeight = 1.0f;
 
-   auto rect = getProportionallyFitRect(texSize, { (i32)state.windowSize.x, (i32)state.windowSize.y });
-   state.zoomLevel = rect.h / (float)texSize.y;
+   if (state.egaStretch) {
+      pxWidth = EGA_PIXEL_WIDTH;
+      pxHeight = EGA_PIXEL_HEIGHT;
+   }
+
+   Float2 t = { texSize.x * pxWidth, texSize.y * pxHeight };
+
+   auto rect = getProportionallyFitRect(t, state.windowSize);
+
+   if (rect.w > rect.h) {
+      state.zoomLevel = rect.h / (float)texSize.y / pxHeight;
+   }
+   else {
+      state.zoomLevel = rect.w / (float)texSize.x / pxWidth;
+   }
+
+   
    state.zoomOffset = {0,0};
 }
 
@@ -320,6 +337,12 @@ static void _doToolbar(Window* wnd, BIMPState &state) {
          ImGuiColorEditFlags_AlphaBar |
          ImGuiColorEditFlags_PickerHueBar);
 
+      if (ImGui::Button("Fit to window")) {
+         if (state.pngTex) {
+            _fitToWindow(state);
+         }
+      }
+
       ImGui::Unindent();
    }
 }
@@ -351,29 +374,8 @@ static void _handleInput(BIMPState &state, Float2 pxSize, Float2 cursorPos) {
       }
    }
 
-   if (state.mouseInImage && ImGui::IsMouseClicked(MOUSE_LEFT)) {
-      ImGui::CaptureMouseFromApp();
-      state.mouseDown = true;
-      Int2 m = { (i32)state.mousePos.x, (i32)state.mousePos.y };
-      state.lastMouse = m;
-   }
-
-   if (ImGui::IsMouseReleased(MOUSE_LEFT) && state.mouseDown) {
-      state.mouseDown = false;
-      ImGui::CaptureMouseFromApp(false);
-   }
-
-   if (ImGui::IsMouseDown(MOUSE_LEFT) && state.mouseDown) {
-      Int2 m = { (i32)state.mousePos.x, (i32)state.mousePos.y };      
-      egaRenderLine(state.ega, state.lastMouse, m, state.useColors[0]);
-      state.lastMouse = m;
-   }
-
-   
-
    // hover actions
    if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenOverlapped)) {
-
       // ctrl+wheel zooming
       if (io.KeyCtrl && fabs(io.MouseWheel) > 0.0f) {
          auto zoom = state.zoomLevel;
@@ -394,6 +396,31 @@ static void _handleInput(BIMPState &state, Float2 pxSize, Float2 cursorPos) {
          }
       }
    }
+
+   // now we handle actual tool functions, which dont happen if we're holding ctrl
+   if (io.KeyCtrl) {
+      return;
+   }
+
+   if (state.mouseInImage && ImGui::IsMouseClicked(MOUSE_LEFT)) {
+      ImGui::CaptureMouseFromApp();
+      state.mouseDown = true;
+      Int2 m = { (i32)state.mousePos.x, (i32)state.mousePos.y };
+      state.lastMouse = m;
+   }
+
+   if (ImGui::IsMouseReleased(MOUSE_LEFT) && state.mouseDown) {
+      state.mouseDown = false;
+      ImGui::CaptureMouseFromApp(false);
+   }
+
+   if (ImGui::IsMouseDown(MOUSE_LEFT) && state.mouseDown) {
+      Int2 m = { (i32)state.mousePos.x, (i32)state.mousePos.y };      
+      egaRenderLine(state.ega, state.lastMouse, m, state.useColors[0]);
+      state.lastMouse = m;
+   }
+
+   
 }
 
 static void _showStats(BIMPState &state, float viewHeight) {

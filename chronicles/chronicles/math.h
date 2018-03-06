@@ -52,6 +52,7 @@ static bool rectiIntersects(Recti a, Recti b) {
    return true;
 }
 
+Recti getProportionallyFitRect(Float2 srcSize, Float2 destSize);
 Recti getProportionallyFitRect(Int2 srcSize, Int2 destSize);
 
 
