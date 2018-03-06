@@ -56,8 +56,7 @@ int egaTextureDecode(EGATexture *self, Texture* target, EGAPalette *palette);
 int egaTextureSerialize(EGATexture *self, byte **outBuff, u64 *size);
 EGATexture *egaTextureDeserialize(byte *buff, u64 size);
 
-u32 egaTextureGetWidth(EGATexture *self);
-u32 egaTextureGetHeight(EGATexture *self);
+Int2 egaTextureGetSize(EGATexture *self);
 
 void egaTextureResize(EGATexture *self, u32 width, u32 height);
 

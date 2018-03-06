@@ -83,7 +83,7 @@ struct EGATexture {
    EGARegion fullRegion = { 0 };
 
    u32 alphaSLWidth = 0; //size in bytes of the alpha channel scanlines
-   u32 pixelSLWidth = 0; //size in bytes of the pixel datga scanlines
+   u32 pixelSLWidth = 0; //size in bytes of the pixel data scanlines
    u32 pixelCount = 0;
 
    // 1 bit per pixel, 0 for transparent
@@ -120,6 +120,30 @@ static void _freeTextureBuffers(EGATexture *self) {
    }
 }
 
+static void _cleanOffset(EGATexture* self) {
+   if (self->dirty&Tex_OFFSET_DIRTY) {
+      //we dont even want to alloc this unless we try cleaning it
+      if (!self->pixelDataOffset) {
+         self->pixelDataOffset = new byte[self->h * self->pixelSLWidth];
+      }
+      memset(self->pixelDataOffset, 0, self->h * self->pixelSLWidth);
+      // ok so all we have to do here is left-shit every damn byte by 4
+      byte *destsl = self->pixelDataOffset;
+      byte *srcsl = self->pixelData;
+
+      for (int y = 0; y < self->h; ++y) {
+         for (int x = 0; x < self->pixelSLWidth - 1; ++x) {
+            destsl[x] &= srcsl[x] << 4;
+            destsl[x + 1] = srcsl[x] >> 4;
+         }
+
+         destsl += self->pixelSLWidth;
+         srcsl += self->pixelSLWidth;
+      }
+
+      self->dirty &= ~Tex_OFFSET_DIRTY;
+   }
+}
 
 EGATexture *egaTextureCreate(u32 width, u32 height) {
    EGATexture *self = new EGATexture();
@@ -595,8 +619,7 @@ void egaTextureResize(EGATexture *self, u32 width, u32 height) {
    self->dirty = Tex_ALL_DIRTY;
 }
 
-u32 egaTextureGetWidth(EGATexture *self) { return self->w; }
-u32 egaTextureGetHeight(EGATexture *self) { return self->h; }
+Int2 egaTextureGetSize(EGATexture *self) { return { self->w, self->h }; }
 EGARegion *egaTextureGetFullRegion(EGATexture *self) { return &self->fullRegion; }
 
 EGAPColor egaTextureGetColorAt(EGATexture *self, u32 x, u32 y, EGARegion *vp) {
@@ -673,6 +696,51 @@ void egaClearAlpha(EGATexture *target) {
 }
 void egaRenderTexture(EGATexture *target, Int2 pos, EGATexture *tex, EGARegion *vp) {
    if (!vp) { vp = &target->fullRegion; }
+
+   Int2 offsetPos = { pos.x + vp->x, pos.y + vp->y };
+
+   if (offsetPos.x >= vp->w || offsetPos.y >= vp->h ||
+      offsetPos.x < -tex->w || offsetPos.y < -tex->h) {
+      //outside bounds, return
+      return;
+   }
+
+   Recti srcRect = { 0 };
+   srcRect.x = offsetPos.x < 0 ? -offsetPos.x : 0;
+   srcRect.y = offsetPos.y < 0 ? -offsetPos.y : 0;
+   srcRect.w = MIN(vp->w, MIN(vp->w - offsetPos.x, tex->w - srcRect.x));
+   srcRect.h = MIN(vp->h, MIN(vp->h - offsetPos.y, tex->h - srcRect.y));
+
+   Int2 destPos = { 0 };
+   destPos.x = offsetPos.x < 0 ? 0 : pos.x;
+   destPos.y = offsetPos.y < 0 ? 0 : pos.y;
+
+   // ok so if pos.x is even then we are aligned and can just copy a byte at a time
+   // if its odd, we do the same but with the offset buffer
+
+   byte *dest = target->pixelData + destPos.y * target->pixelSLWidth;   
+   byte *destalpha = target->alphaChannel + destPos.y * target->alphaSLWidth;
+   byte *src = tex->pixelData + srcRect.y * tex->pixelSLWidth;
+   byte *srcalpha = tex->alphaChannel + srcRect.y * tex->alphaSLWidth;
+
+   int drawSLWidth = (srcRect.w >> 3) + ((srcRect.w & 7) ? 1 : 0);
+   int srcStartByte = srcRect.x >> 3;
+   int destStartByte = destPos.x >> 3;
+
+   for (int y = 0; y < srcRect.h; ++y) {
+      // iterate over every byte the draw
+      for (int b = 0; b < drawSLWidth; ++b) {
+
+      }
+
+      // increment trackers to next scanline
+      dest += target->pixelSLWidth;
+      destalpha += target->alphaSLWidth;
+      src += tex->pixelSLWidth;
+      srcalpha += tex->alphaSLWidth;
+   }
+
+
 }
 void egaRenderTexturePartial(EGATexture *target, Int2 pos, EGATexture *tex, Recti uv, EGARegion *vp) {
    if (!vp) { vp = &target->fullRegion; }
