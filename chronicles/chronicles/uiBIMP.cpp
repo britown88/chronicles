@@ -15,12 +15,27 @@
 
 #define POPUPID_COLORPICKER "egapicker"
 
+enum ToolStates_ {
+   ToolStates_PENCIL = 0,
+   ToolStates_LINES,
+   ToolStates_RECT,
+   ToolStates_FLOODFILL,
+   ToolStates_EYEDROP,
+   ToolStates_REGION_PICK,
+   ToolStates_REGION_PICKED,
+   ToolStates_REGION_DRAG,
+};
+typedef byte ToolStates;
+
+
 struct BIMPState {
+
    Texture* pngTex = nullptr;
    EGATexture *ega = nullptr;
    EGAPalette encPal;
    char palName[64];
 
+   ToolStates toolState =  ToolStates_PENCIL;
    EGAPColor popupCLickedColor = 0; // for color picker popup
    Float2 mousePos = { 0 }; //mouse positon within the image coords (updated per frame)
    bool mouseInImage = false; //helper boolean for every frame
@@ -37,6 +52,8 @@ struct BIMPState {
    Int2 lastMouse = { 0 };
 
    EGAColor useColors[2] = { 0, 1 };
+
+
 };
 
 static std::string _genWinTitle(BIMPState *state) {
@@ -103,6 +120,8 @@ static bool _doColorSelectButton(BIMPState &state, u32 idx) {
    _colorButtonEGAStart(state.encPal.colors[state.useColors[idx]]);
    auto out = ImGui::Button(label.c_str(), ImVec2(32.0f, 32.0f));
 
+   
+
    if (ImGui::BeginDragDropTarget()) {
       if (auto payload = ImGui::AcceptDragDropPayload(UI_DRAGDROP_PALCOLOR)) {
          auto plData = (uiDragDropPalColor*)payload->Data;
@@ -146,7 +165,7 @@ static void _doToolbar(Window* wnd, BIMPState &state) {
 
    if (ImGui::CollapsingHeader("Palette", ImGuiTreeNodeFlags_DefaultOpen)) {
       ImGui::Indent();
-      uiPaletteEditor(wnd, &state.encPal, state.palName, 64, state.ega ? 0 : PaletteEditorFlags_ENCODE);
+      uiPaletteEditor(wnd, &state.encPal, state.palName, 64, PaletteEditorFlags_ENCODE);
       ImGui::Unindent();
    }
    if (ImGui::CollapsingHeader("Image", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -168,16 +187,32 @@ static void _doToolbar(Window* wnd, BIMPState &state) {
       ImGui::NewLine();
       ImGui::Separator();
 
-      ImGui::BeginGroup();
-
-      bool btnPencil = ImGui::Button(ICON_FA_PENCIL_ALT " Pencil###pen");
-      bool btnErase = ImGui::Button(ICON_FA_ERASER " Eraser");
+      ImGui::BeginGroup();     
+      if (state.toolState == ToolStates_PENCIL) { ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive)); }
+      bool btnPencil = ImGui::Button(ICON_FA_PENCIL_ALT " Pencil");  
+      if (state.toolState == ToolStates_PENCIL) { ImGui::PopStyleColor(); }
+      if (state.toolState == ToolStates_FLOODFILL) { ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive)); }
       bool btnFill = ImGui::Button(ICON_FA_PAINT_BRUSH " Flood Fill");
+      if (state.toolState == ToolStates_FLOODFILL) { ImGui::PopStyleColor(); }
+      bool btnErase = ImGui::Button(ICON_FA_ERASER " Eraser");
+      if (state.toolState == ToolStates_EYEDROP) { ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive)); }
+      bool btnColorPicker = ImGui::Button(ICON_FA_EYE_DROPPER " Pick Color");
+      if (state.toolState == ToolStates_EYEDROP) { ImGui::PopStyleColor(); }
       ImGui::EndGroup();
+
       ImGui::SameLine();
+
       ImGui::BeginGroup();
+      if (state.toolState == ToolStates_LINES) { ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive)); }
+      bool btnLines = ImGui::Button(ICON_FA_STAR " Draw Lines");
+      if (state.toolState == ToolStates_LINES) { ImGui::PopStyleColor(); }
+      if (state.toolState == ToolStates_RECT) { ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive)); }
       bool btnRect = ImGui::Button(ICON_FA_SQUARE " Draw Rect");
+      if (state.toolState == ToolStates_RECT) { ImGui::PopStyleColor(); }
+      bool regionState = state.toolState >= ToolStates_REGION_PICK; //TODO: This is bad
+      if (regionState) { ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive)); }
       bool btnRegion = ImGui::Button(ICON_FA_EXPAND " Region Select");
+      if (regionState) { ImGui::PopStyleColor(); }
       bool btnCrop = ImGui::Button(ICON_FA_CROP " Crop");
       ImGui::EndGroup();
 
@@ -310,8 +345,8 @@ static void _handleInput(BIMPState &state, Float2 pxSize, Float2 cursorPos) {
 
    if (ImGui::IsItemActive()) {
       if (io.KeyCtrl && ImGui::IsMouseDragging()) {
-         state.zoomOffset.x += ImGui::GetIO().MouseDelta.x;
-         state.zoomOffset.y += ImGui::GetIO().MouseDelta.y;
+         state.zoomOffset.x += (i32)ImGui::GetIO().MouseDelta.x;
+         state.zoomOffset.y += (i32)ImGui::GetIO().MouseDelta.y;
       }
 
       ImGui::Begin("asddfasd");
@@ -322,8 +357,8 @@ static void _handleInput(BIMPState &state, Float2 pxSize, Float2 cursorPos) {
          auto zoom = state.zoomLevel;
          state.zoomLevel = MIN(100, MAX(0.1f, state.zoomLevel + io.MouseWheel * 0.05f * state.zoomLevel));
 
-         state.zoomOffset.x = -(state.mousePos.x * state.zoomLevel * pxSize.x - (io.MousePos.x - cursorPos.x));
-         state.zoomOffset.y = -(state.mousePos.y * state.zoomLevel * pxSize.y - (io.MousePos.y - cursorPos.y));
+         state.zoomOffset.x = -(i32)(state.mousePos.x * state.zoomLevel * pxSize.x - (io.MousePos.x - cursorPos.x));
+         state.zoomOffset.y = -(i32)(state.mousePos.y * state.zoomLevel * pxSize.y - (io.MousePos.y - cursorPos.y));
       }
 
       if (ImGui::IsMouseDown(0)) {
