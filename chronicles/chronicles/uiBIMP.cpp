@@ -41,6 +41,7 @@ struct BIMPState {
    Float2 mousePos = { 0 }; //mouse positon within the image coords (updated per frame)
    bool mouseInImage = false; //helper boolean for every frame
    Int2 lastMouse = { 0 }; // mouse position of last frame
+   Int2 lastPointPlaced = { 0 }; // last point added by pencil
    bool mouseDown = false; // only gets true when mouse clicking in a valid image
 
    float zoomLevel = 1.0f;
@@ -348,7 +349,12 @@ static void _doToolbar(Window* wnd, BIMPState &state) {
 }
 
 static void _doToolMousePressed(BIMPState &state, Int2 mouse) {
-
+   auto &io = ImGui::GetIO();
+   if (io.KeyShift) {
+      egaRenderLine(state.ega, state.lastPointPlaced, mouse, state.useColors[0]);
+      state.lastPointPlaced = mouse;
+      state.mouseDown = false;
+   }
 }
 
 static void _doToolMouseReleased(BIMPState &state, Int2 mouse) {
@@ -357,6 +363,7 @@ static void _doToolMouseReleased(BIMPState &state, Int2 mouse) {
 
 static void _doToolMouseDown(BIMPState &state, Int2 mouse) {
    egaRenderLine(state.ega, state.lastMouse, mouse, state.useColors[0]);
+   state.lastPointPlaced = mouse;
 }
 
 // this function immediately follows the invisibile dummy button for the viewer
@@ -434,8 +441,22 @@ static void _handleInput(BIMPState &state, Float2 pxSize, Float2 cursorPos) {
    }
 }
 
-static void _doCustomToolRender(BIMPState &state, ImDrawList *draw_list, ImVec2 p) {
-   if (!state.ega) {
+static ImVec2 _imageToScreen(Float2 imgCoords, BIMPState &state, ImVec2 const &p) {
+   float pxWidth = 1.0f;
+   float pxHeight = 1.0f;
+
+   if (state.egaStretch) {
+      pxWidth = EGA_PIXEL_WIDTH;
+      pxHeight = EGA_PIXEL_HEIGHT;
+   }
+
+   return {
+      imgCoords.x * pxWidth * state.zoomLevel + p.x + state.zoomOffset.x,
+      imgCoords.y * pxHeight * state.zoomLevel + p.y + state.zoomOffset.y };
+}
+
+static void _doCustomToolRender(BIMPState &state, ImDrawList *draw_list, ImVec2 const &p) {
+   if (!state.ega || !state.mouseInImage) {
       return;
    }
 
@@ -444,15 +465,20 @@ static void _doCustomToolRender(BIMPState &state, ImDrawList *draw_list, ImVec2 
 
    switch (state.toolState) {
    case ToolStates_PENCIL: {
-      ImVec2 a = {
-         (i32)(state.mousePos.x) * state.zoomLevel + p.x + state.zoomOffset.x, 
-         (i32)(state.mousePos.y) * state.zoomLevel + p.y + state.zoomOffset.y };
+      auto a = _imageToScreen(Float2{ floorf(state.mousePos.x), floorf(state.mousePos.y) }, state, p);
+      auto b = _imageToScreen(Float2{ floorf(state.mousePos.x+1), floorf(state.mousePos.y+1) }, state, p);
+      draw_list->AddRect(a, b, IM_COL32_BLACK);
 
-      ImVec2 b = {
-         (i32)(state.mousePos.x + 1) * state.zoomLevel + p.x + state.zoomOffset.x,
-         (i32)(state.mousePos.y + 1) * state.zoomLevel + p.y + state.zoomOffset.y };
+      if (io.KeyShift) {
+         auto lasta = _imageToScreen(Float2{ (f32)state.lastPointPlaced.x, (f32)state.lastPointPlaced.y }, state, p);
+         auto lastb = _imageToScreen(Float2{ (f32)state.lastPointPlaced.x + 1, (f32)state.lastPointPlaced.y + 1 }, state, p);
+         draw_list->AddRect(lasta, lastb, IM_COL32_BLACK);
 
-      draw_list->AddRect(a, b, IM_COL32(0, 0, 0, 255));
+         auto centerA = _imageToScreen(Float2{ floorf(state.mousePos.x) + 0.5f, floorf(state.mousePos.y) + 0.5f }, state, p);
+         auto centerB = _imageToScreen(Float2{ state.lastPointPlaced.x + 0.5f, state.lastPointPlaced.y + 0.5f }, state, p);
+         draw_list->AddLine(centerA, centerB, IM_COL32_BLACK);
+      }
+
       break; }
       
    }
