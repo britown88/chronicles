@@ -11,6 +11,8 @@
 
 #include "SDL2/SDL_scancode.h"
 
+#define MAX_IMG_DIM 0x100000
+
 #define POPUPID_COLORPICKER "egapicker"
 
 struct BIMPState {
@@ -25,12 +27,13 @@ struct BIMPState {
 
    float zoomLevel = 1.0f;
    Int2 zoomOffset = {};
+   Float2 windowSize = { 0 }; //set every frame
+   Int2 enteredSize = { 32, 32 }; // for holding onto size selection
 
    bool egaStretch = false;
    ImVec4 bgColor;
 
    std::string winName;
-   Int2 selectedSize = { 0 };
    Int2 lastMouse = { 0 };
 
    EGAColor useColors[2] = { 0, 1 };
@@ -61,6 +64,14 @@ static std::string _getPng() {
    return openFile(cfg);
 }
 
+static void _fitToWindow(BIMPState &state) {
+   auto texSize = textureGetSize(state.pngTex);
+
+   auto rect = getProportionallyFitRect(texSize, { (i32)state.windowSize.x, (i32)state.windowSize.y });
+   state.zoomLevel = rect.h / (float)texSize.y;
+   state.zoomOffset = {0,0};
+}
+
 static void _loadPNG(BIMPState &state) {
    auto png = _getPng();
    if (!png.empty()) {
@@ -71,10 +82,10 @@ static void _loadPNG(BIMPState &state) {
       auto palName = pathGetFilename(png.c_str());
       strcpy(state.palName, palName.c_str());
 
-      state.selectedSize = textureGetSize(state.pngTex);
+      state.enteredSize = textureGetSize(state.pngTex);
+      _fitToWindow(state);
    }
 }
-
 
 static void _colorButtonEGAStart(EGAColor c) {
    auto egac = egaGetColor(c);
@@ -82,13 +93,13 @@ static void _colorButtonEGAStart(EGAColor c) {
    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(egac.r, egac.g, egac.b, 128));
    ImGui::PushStyleColor(ImGuiCol_ButtonActive, IM_COL32(egac.r, egac.g, egac.b, 255));
 }
-
 static void _colorButtonEGAEnd() {
    ImGui::PopStyleColor(3);
 }
 
 static bool _doColorSelectButton(BIMPState &state, u32 idx) {
    auto label = format("##select%d", idx);
+   auto popLabel = format("%spopup", label.c_str());
    _colorButtonEGAStart(state.encPal.colors[state.useColors[idx]]);
    auto out = ImGui::Button(label.c_str(), ImVec2(32.0f, 32.0f));
 
@@ -102,6 +113,30 @@ static bool _doColorSelectButton(BIMPState &state, u32 idx) {
       ImGui::EndDragDropTarget();
    }
    _colorButtonEGAEnd();
+
+   if (out) {
+      ImGui::OpenPopup(popLabel.c_str());
+   }
+
+   if (ImGui::BeginPopup(popLabel.c_str(), ImGuiWindowFlags_AlwaysAutoResize)) {
+      ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(1, 1));
+
+      for (byte i = 0; i < 16; ++i) {
+         ImGui::PushID(i);
+         _colorButtonEGAStart(state.encPal.colors[i]);
+         if (ImGui::Button("", ImVec2(20,20))) {
+            state.useColors[idx] = i;
+            ImGui::CloseCurrentPopup();
+         }         
+         _colorButtonEGAEnd();
+         ImGui::PopID();
+
+         ImGui::SameLine();
+      }
+
+      ImGui::PopStyleVar();
+      ImGui::EndPopup();
+   }
 
    return out;
 }
@@ -150,9 +185,9 @@ static void _doToolbar(Window* wnd, BIMPState &state) {
 
       float spd = state.ega ? 1.0f : 0.0f;
       i32 size[2] = { 0 };
-      memcpy(size, &state.selectedSize, sizeof(i32) * 2);
-      ImGui::DragInt2("Size", size, spd, 0, 0);
-      if (memcmp(size, &state.selectedSize, sizeof(i32) * 2)) {
+      memcpy(size, &state.enteredSize, sizeof(i32) * 2);
+      ImGui::DragInt2("Size", size, spd, 0, MAX_IMG_DIM);
+      if (memcmp(size, &state.enteredSize, sizeof(i32) * 2)) {
          if (state.pngTex) {
             // change happened, resize
             //memcpy(state.selectedSize, size, sizeof(int) * 2);
@@ -169,13 +204,13 @@ static void _doToolbar(Window* wnd, BIMPState &state) {
       }
       if (ImGui::BeginPopupModal("New Image Size")) {
          ImGui::Dummy(ImVec2(200, 0));
-         ImGui::DragInt2("Size", (i32*)&state.selectedSize, 1, 0, 0);
+         ImGui::DragInt2("Size", (i32*)&state.enteredSize, 1, 0, MAX_IMG_DIM);
          if (ImGui::Button("Create!")) {
             _stateTexCleanup(state);
-            state.pngTex = textureCreateCustom(state.selectedSize.x, state.selectedSize.y, { RepeatType_CLAMP, FilterType_NEAREST });
-            state.ega = egaTextureCreate(state.selectedSize.x, state.selectedSize.y);
+            state.pngTex = textureCreateCustom(state.enteredSize.x, state.enteredSize.y, { RepeatType_CLAMP, FilterType_NEAREST });
+            state.ega = egaTextureCreate(state.enteredSize.x, state.enteredSize.y);
             egaClearAlpha(state.ega);
-
+            _fitToWindow(state);
             ImGui::CloseCurrentPopup();
          }
 
@@ -350,8 +385,10 @@ bool _doUI(Window* wnd, BIMPState &state) {
       ImGui::SameLine();
       availSize = ImGui::GetContentRegionAvail();
       if (ImGui::BeginChild("DrawArea", availSize, true, ImGuiWindowFlags_NoScrollWithMouse)) {
-         if (state.pngTex) {
-            auto viewSize = ImGui::GetContentRegionAvail();
+         auto viewSize = ImGui::GetContentRegionAvail();
+         state.windowSize = { viewSize.x, viewSize.y };
+
+         if (state.pngTex) {            
             auto texSize = textureGetSize(state.pngTex);
             float pxWidth = 1.0f;
             float pxHeight = 1.0f;
