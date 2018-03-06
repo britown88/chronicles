@@ -607,7 +607,9 @@ bool _doUI(Window* wnd, BIMPState &state) {
             state.mousePos.y = (io.MousePos.y - p.y - state.zoomOffset.y) / state.zoomLevel / pxHeight;
             state.mouseInImage = 
                state.mousePos.x > 0.0f && state.mousePos.x < texSize.x && 
-               state.mousePos.y > 0.0f && state.mousePos.y < texSize.y;
+               state.mousePos.y > 0.0f && state.mousePos.y < texSize.y && 
+               (io.MousePos.x >= p.x && io.MousePos.x < p.x + viewSize.x) &&
+               (io.MousePos.y >= p.y && io.MousePos.y < p.y + viewSize.y);
 
             //in our own clip rect we draw an alpha grid and a border            
             draw_list->PushClipRect(a, b, true);

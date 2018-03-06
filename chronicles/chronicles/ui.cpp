@@ -877,6 +877,12 @@ static void _showWindowedViewer(Window* wnd) {
 
    if (ImGui::Begin("Viewer", nullptr, 0)) {
 
+      if (ImGui::IsWindowFocused()) {
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_ESCAPE)) {
+            windowClose(wnd);
+         }
+      }
+
       ImGui::Columns(2);
 
       //if (ImGui::IsWindowAppearing()) {
