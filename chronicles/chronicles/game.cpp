@@ -110,6 +110,8 @@ std::vector<std::string> paletteList(PaletteManager* manager, StringView search)
 }
 
 static void _gameDataInit(GameData* game) {
+   egaStartup();
+
    game->primaryView.palette = { 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16 };
    game->primaryView.egaTexture = egaTextureCreate(EGA_RES_WIDTH, EGA_RES_HEIGHT);
    game->primaryView.texture = textureCreateCustom(EGA_RES_WIDTH, EGA_RES_HEIGHT, {RepeatType_CLAMP, FilterType_NEAREST}); 

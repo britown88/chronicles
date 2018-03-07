@@ -29,9 +29,13 @@ typedef struct {
    EGAColor colors[EGA_PALETTE_COLORS];
 } EGAPalette;
 
+void egaStartup();
+
 // Takes an EGA color index (0-63) and returns the 3-byte RGB
 // useful externally for reference graphics
-ColorRGB egaGetColor(EGAColor c);
+extern ColorRGB g_egaToRGBTable[64];
+#define egaGetColor(c) g_egaToRGBTable[c]
+
 
 // attempt to reduce a 3-byte rgb to 6 bit ega color
 EGAColor egaReduceRGB(ColorRGB c);

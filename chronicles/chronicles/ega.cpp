@@ -32,15 +32,9 @@ static void _buildColorTable(ColorRGB *table) {
    }
 }
 
-ColorRGB egaGetColor(EGAColor c) {
-   static ColorRGB lookup[EGA_COLORS] = { 0 };
-   static bool loaded = 0;
-
-   if (!loaded) {
-      _buildColorTable(lookup);
-      loaded = 1;
-   }
-   return lookup[c];
+ColorRGB g_egaToRGBTable[64] = { 0 };
+void egaStartup() {
+   _buildColorTable(g_egaToRGBTable);
 }
 
 //EGAColor egaReduceRGB(ColorRGB c) {
@@ -619,7 +613,7 @@ void egaTextureResize(EGATexture *self, u32 width, u32 height) {
    self->dirty = Tex_ALL_DIRTY;
 }
 
-Int2 egaTextureGetSize(EGATexture *self) { return { self->w, self->h }; }
+Int2 egaTextureGetSize(EGATexture *self) { return { (i32)self->w, (i32)self->h }; }
 EGARegion *egaTextureGetFullRegion(EGATexture *self) { return &self->fullRegion; }
 
 EGAPColor egaTextureGetColorAt(EGATexture *self, u32 x, u32 y, EGARegion *vp) {
@@ -700,7 +694,7 @@ void egaRenderTexture(EGATexture *target, Int2 pos, EGATexture *tex, EGARegion *
    Int2 offsetPos = { pos.x + vp->x, pos.y + vp->y };
 
    if (offsetPos.x >= vp->w || offsetPos.y >= vp->h ||
-      offsetPos.x < -tex->w || offsetPos.y < -tex->h) {
+      offsetPos.x < -(i32)tex->w || offsetPos.y < -(i32)tex->h) {
       //outside bounds, return
       return;
    }
