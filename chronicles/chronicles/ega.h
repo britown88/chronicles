@@ -45,6 +45,7 @@ extern ColorRGB g_egaToRGBTable[64];
 typedef struct EGATexture EGATexture;
 
 EGATexture *egaTextureCreate(u32 width, u32 height);
+EGATexture *egaTextureCreateCopy(EGATexture *other);
 void egaTextureDestroy(EGATexture *self);
 
 // encoding and decoding from an rgb texture

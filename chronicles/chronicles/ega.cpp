@@ -92,6 +92,11 @@ EGATexture *egaTextureCreate(u32 width, u32 height) {
 
    return self;
 }
+EGATexture *egaTextureCreateCopy(EGATexture *other) {
+   auto out = egaTextureCreate(other->w, other->h);
+   memcpy(out->pixelData, other->pixelData, out->pixelCount);
+   return out;
+}
 void egaTextureDestroy(EGATexture *self) {
    _freeTextureBuffers(self);
    delete self;
