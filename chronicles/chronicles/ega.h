@@ -22,6 +22,9 @@
 #define EGA_BYTES (EGA_PIXELS / 8)
 #define EGA_PLANES 4
 
+// byte value for alpha
+#define EGA_ALPHA 0xFF
+
 // EGA Supports one of 64 colors
 typedef byte EGAColor;
 typedef byte EGAPColor; //(0-15)
@@ -35,11 +38,6 @@ void egaStartup();
 // useful externally for reference graphics
 extern ColorRGB g_egaToRGBTable[64];
 #define egaGetColor(c) g_egaToRGBTable[c]
-
-
-// attempt to reduce a 3-byte rgb to 6 bit ega color
-EGAColor egaReduceRGB(ColorRGB c);
-
 
 // EGATextures are encoded images consistenting of 4 bits per pixel, referring to a palette index
 // These were stored in 4 seperate bit planes but are intervleaved on the backend here

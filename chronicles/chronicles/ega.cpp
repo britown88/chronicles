@@ -58,7 +58,7 @@ enum Tex_ {
 };
 typedef byte TexCleanFlag;
 
-#define EGA_ALPHA 0xFF
+
 
 struct EGATexture {
    u32 w = 0, h = 0;

@@ -57,6 +57,7 @@ struct BIMPState {
    bool egaStretch = false;
    ImVec4 bgColor;
    EGAColor useColors[2] = { 0, 1 };
+   bool erase = false;
 
    std::string winName;
 };
@@ -248,8 +249,10 @@ static void _doToolbar(Window* wnd, BIMPState &state) {
       bool btnFill = ImGui::Button(ICON_FA_PAINT_BRUSH " Flood Fill");
       if (ImGui::IsItemHovered()) { ImGui::SetTooltip("(F)"); }
       if (state.toolState == ToolStates_FLOODFILL) { ImGui::PopStyleColor(); }
+      if (state.erase) { ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive)); }
       bool btnErase = ImGui::Button(ICON_FA_ERASER " Eraser");
       if (ImGui::IsItemHovered()) { ImGui::SetTooltip("(E)"); }
+      if (state.erase) { ImGui::PopStyleColor(); }
       if (state.toolState == ToolStates_EYEDROP) { ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive)); }
       bool btnColorPicker = ImGui::Button(ICON_FA_EYE_DROPPER " Pick Color");
       if (ImGui::IsItemHovered()) { ImGui::SetTooltip("(C) or RightClick Pixel"); }
@@ -298,7 +301,7 @@ static void _doToolbar(Window* wnd, BIMPState &state) {
       if (btnSwapColors) { std::swap(state.useColors[0], state.useColors[1]); }
       if (btnPencil) { state.toolState = ToolStates_PENCIL; }
       if (btnFill) { state.toolState = ToolStates_FLOODFILL; }
-      if (btnErase) { state.useColors[0] = 255; }
+      if (btnErase) { state.erase = !state.erase; }
       if (btnColorPicker) { state.toolState = ToolStates_EYEDROP; }
       if (btnLines) { state.toolState = ToolStates_LINES; }
       if (btnRect) { state.toolState = ToolStates_RECT; }
@@ -426,6 +429,65 @@ static Recti _makeRect(Int2 const &a, Int2 const &b) {
 }
 
 
+static void _floodFill(EGATexture *tex, Int2 mousePoint, EGAPColor c) {
+   auto texSize = egaTextureGetSize(tex);
+   auto pixelCount = texSize.x * texSize.y;
+   byte *visited = new byte[pixelCount];
+   memset(visited, 0, pixelCount);
+
+   auto oc = egaTextureGetColorAt(tex, mousePoint.x, mousePoint.y);
+   std::vector<Int2> neighbors;
+   neighbors.push_back(mousePoint);
+
+   while (!neighbors.empty()) {
+      auto spot = neighbors.back();
+      neighbors.pop_back();
+      auto idx = spot.y * texSize.x + spot.x;
+
+      visited[idx] = true;
+
+      if (egaTextureGetColorAt(tex, spot.x, spot.y) == oc) {
+         egaRenderPoint(tex, spot, c);
+
+         Int2 n = { spot.x, spot.y - 1 };
+         if (n.x >= 0 && n.x < texSize.x && n.y >= 0 && n.y < texSize.y) {
+            auto idx = n.y * texSize.x + n.x;
+            if (!visited[idx]) {
+               neighbors.push_back(n);
+            }
+         }
+
+         n = { spot.x, spot.y + 1 };
+         if (n.x >= 0 && n.x < texSize.x && n.y >= 0 && n.y < texSize.y) {
+            auto idx = n.y * texSize.x + n.x;
+            if (!visited[idx]) {
+               neighbors.push_back(n);
+            }
+         }
+
+         n = { spot.x+1, spot.y };
+         if (n.x >= 0 && n.x < texSize.x && n.y >= 0 && n.y < texSize.y) {
+            auto idx = n.y * texSize.x + n.x;
+            if (!visited[idx]) {
+               neighbors.push_back(n);
+            }
+         }
+
+         n = { spot.x-1, spot.y };
+         if (n.x >= 0 && n.x < texSize.x && n.y >= 0 && n.y < texSize.y) {
+            auto idx = n.y * texSize.x + n.x;
+            if (!visited[idx]) {
+               neighbors.push_back(n);
+            }
+         }
+      }
+   }
+
+   visited[texSize.x*mousePoint.y+mousePoint.y] = true;
+
+   delete[] visited;
+}
+
 static void _doToolMousePressed(BIMPState &state, Int2 mouse) {
    auto &io = ImGui::GetIO();
    switch (state.toolState) {
@@ -445,6 +507,10 @@ static void _doToolMousePressed(BIMPState &state, Int2 mouse) {
       else {
          egaRenderRect(state.editEGA, _makeRect(mouse, mouse), state.useColors[0]);
       }
+      break; }
+   case ToolStates_FLOODFILL: {
+      _floodFill(state.ega, mouse, state.useColors[0]);
+      state.mouseDown = false;
       break; }
    case ToolStates_LINES: {
       state.lastPointPlaced = mouse;
