@@ -255,14 +255,14 @@ static bool _doColorSelectButton(BIMPState &state, u32 idx) {
 static void _doToolbar(Window* wnd, BIMPState &state) {
    auto &imStyle = ImGui::GetStyle();
 
-   if (ImGui::Begin("historydebug", 0, ImGuiWindowFlags_AlwaysAutoResize)) {
-      ImGui::Text("History Position: %d", state.historyPosition);
-      int i = 0;
-      for (auto h : state.history) {
-         ImGui::Text("Snapshot %d", i++);
-      }
-   }
-   ImGui::End();
+   //if (ImGui::Begin("historydebug", 0, ImGuiWindowFlags_AlwaysAutoResize)) {
+   //   ImGui::Text("History Position: %d", state.historyPosition);
+   //   int i = 0;
+   //   for (auto h : state.history) {
+   //      ImGui::Text("Snapshot %d", i++);
+   //   }
+   //}
+   //ImGui::End();
 
    if (ImGui::CollapsingHeader("Palette", ImGuiTreeNodeFlags_DefaultOpen)) {
       ImGui::Indent();
