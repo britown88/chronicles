@@ -167,9 +167,7 @@ static bool _doColorSelectButton(BIMPState &state, u32 idx) {
    auto label = format("##select%d", idx);
    auto popLabel = format("%spopup", label.c_str());
    _colorButtonEGAStart(state.palette.colors[state.useColors[idx]]);
-   auto out = ImGui::Button(label.c_str(), ImVec2(32.0f, 32.0f));
-
-   
+   auto out = ImGui::Button(label.c_str(), ImVec2(32.0f - 8 * idx, 32.0f - 8 * idx));
 
    if (ImGui::BeginDragDropTarget()) {
       if (auto payload = ImGui::AcceptDragDropPayload(UI_DRAGDROP_PALCOLOR)) {
@@ -222,9 +220,12 @@ static void _doToolbar(Window* wnd, BIMPState &state) {
       ImGui::Indent();
 
       bool btnNew = ImGui::Button(ICON_FA_FILE " New"); ImGui::SameLine();
+      if (ImGui::IsItemHovered()) { ImGui::SetTooltip("(Ctrl+N)"); }
       bool btnLoad = ImGui::Button(ICON_FA_UPLOAD " Load"); ImGui::SameLine();
+      if (ImGui::IsItemHovered()) { ImGui::SetTooltip("(Ctrl+L)"); }
       if (!state.ega) { ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.5f); }
       bool btnSave = ImGui::Button(ICON_FA_DOWNLOAD " Save");       
+      if (ImGui::IsItemHovered()) { ImGui::SetTooltip("(Ctrl+S)"); }
 
       ImGui::Separator();
 
@@ -233,19 +234,25 @@ static void _doToolbar(Window* wnd, BIMPState &state) {
          ImGui::SameLine();
       }
 
-      ImGui::NewLine();
+      auto btnSwapColors = ImGui::Button(ICON_FA_EXCHANGE_ALT " Swap Colors");
+      if (ImGui::IsItemHovered()) { ImGui::SetTooltip("(X)"); }
+      
       ImGui::Separator();
 
       ImGui::BeginGroup();     
       if (state.toolState == ToolStates_PENCIL) { ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive)); }
       bool btnPencil = ImGui::Button(ICON_FA_PENCIL_ALT " Pencil");  
+      if (ImGui::IsItemHovered()) { ImGui::SetTooltip("(P) Shift for Lines"); }
       if (state.toolState == ToolStates_PENCIL) { ImGui::PopStyleColor(); }
       if (state.toolState == ToolStates_FLOODFILL) { ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive)); }
       bool btnFill = ImGui::Button(ICON_FA_PAINT_BRUSH " Flood Fill");
+      if (ImGui::IsItemHovered()) { ImGui::SetTooltip("(F)"); }
       if (state.toolState == ToolStates_FLOODFILL) { ImGui::PopStyleColor(); }
       bool btnErase = ImGui::Button(ICON_FA_ERASER " Eraser");
+      if (ImGui::IsItemHovered()) { ImGui::SetTooltip("(E)"); }
       if (state.toolState == ToolStates_EYEDROP) { ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive)); }
       bool btnColorPicker = ImGui::Button(ICON_FA_EYE_DROPPER " Pick Color");
+      if (ImGui::IsItemHovered()) { ImGui::SetTooltip("(C) or RightClick Pixel"); }
       if (state.toolState == ToolStates_EYEDROP) { ImGui::PopStyleColor(); }
       ImGui::EndGroup();
 
@@ -254,16 +261,49 @@ static void _doToolbar(Window* wnd, BIMPState &state) {
       ImGui::BeginGroup();
       if (state.toolState == ToolStates_LINES) { ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive)); }
       bool btnLines = ImGui::Button(ICON_FA_STAR " Draw Lines");
+      if (ImGui::IsItemHovered()) { ImGui::SetTooltip("(L)"); }
       if (state.toolState == ToolStates_LINES) { ImGui::PopStyleColor(); }
       if (state.toolState == ToolStates_RECT) { ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive)); }
       bool btnRect = ImGui::Button(ICON_FA_SQUARE " Draw Rect");
+      if (ImGui::IsItemHovered()) { ImGui::SetTooltip("(R) Shift for Outline"); }
       if (state.toolState == ToolStates_RECT) { ImGui::PopStyleColor(); }
       bool regionState = state.toolState >= ToolStates_REGION_PICK; //TODO: This is bad
       if (regionState) { ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive)); }
       bool btnRegion = ImGui::Button(ICON_FA_EXPAND " Region Select");
+      if (ImGui::IsItemHovered()) { ImGui::SetTooltip("(Shift+R)"); }
       if (regionState) { ImGui::PopStyleColor(); }
       bool btnCrop = ImGui::Button(ICON_FA_CROP " Crop");
+      if (ImGui::IsItemHovered()) { ImGui::SetTooltip("(Shift+C)"); }
       ImGui::EndGroup();
+
+      auto &io = ImGui::GetIO();
+
+      if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) {
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_X)) { btnSwapColors = true; }
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_P)) { btnPencil = true; }
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_F)) { btnFill = true; }
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_E)) { btnErase = true; }
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_C)) { btnColorPicker = true; }
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_L)) { btnLines = true; }
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_R)) { btnRect = true; }
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_R) && io.KeyShift) { regionState = true; }
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_C) && io.KeyShift) { btnCrop = true; }
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_N) && io.KeyCtrl) { btnNew = true; }
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_L) && io.KeyCtrl) { btnLoad = true; }
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_S) && io.KeyCtrl) { btnSave = true; }
+
+      }
+
+      //actually do button actions
+      if (btnSwapColors) { std::swap(state.useColors[0], state.useColors[1]); }
+      if (btnPencil) { state.toolState = ToolStates_PENCIL; }
+      if (btnFill) { state.toolState = ToolStates_FLOODFILL; }
+      if (btnErase) { state.useColors[0] = 255; }
+      if (btnColorPicker) { state.toolState = ToolStates_EYEDROP; }
+      if (btnLines) { state.toolState = ToolStates_LINES; }
+      if (btnRect) { state.toolState = ToolStates_RECT; }
+      if (btnRegion) { state.toolState = ToolStates_REGION_PICK; }
+      if (btnCrop) { /*crop*/ }
 
       ImGui::Separator();
 
@@ -289,7 +329,7 @@ static void _doToolbar(Window* wnd, BIMPState &state) {
       if (ImGui::BeginPopupModal("New Image Size")) {
          ImGui::Dummy(ImVec2(200, 0));
          ImGui::DragInt2("Size", (i32*)&state.enteredSize, 1, 0, MAX_IMG_DIM);
-         if (ImGui::Button("Create!")) {
+         if (ImGui::Button("Create!") || ImGui::IsKeyPressed(SDL_SCANCODE_RETURN)) {
             _stateTexCleanup(state);
             state.pngTex = textureCreateCustom(state.enteredSize.x, state.enteredSize.y, { RepeatType_CLAMP, FilterType_NEAREST });
             state.ega = egaTextureCreate(state.enteredSize.x, state.enteredSize.y);
@@ -381,15 +421,35 @@ static void _doToolbar(Window* wnd, BIMPState &state) {
    }
 }
 
+static Recti _makeRect(Int2 const &a, Int2 const &b) {
+   return { MIN(a.x, b.x), MIN(a.y, b.y), labs(b.x - a.x) + 1,  labs(b.y - a.y) + 1 };
+}
+
+
 static void _doToolMousePressed(BIMPState &state, Int2 mouse) {
    auto &io = ImGui::GetIO();
    switch (state.toolState) {
    case ToolStates_PENCIL: {
       if (io.KeyShift) {
-         egaRenderLine(state.ega, state.lastPointPlaced, mouse, state.useColors[0]);
+         egaRenderLine(state.editEGA, state.lastPointPlaced, mouse, state.useColors[0]);
          state.lastPointPlaced = mouse;
          state.mouseDown = false;
       }
+      break; }
+   case ToolStates_RECT: {
+      state.lastPointPlaced = mouse;
+      egaClearAlpha(state.editEGA);
+      if (io.KeyShift) {
+         egaRenderLineRect(state.editEGA, _makeRect(mouse, mouse), state.useColors[0]);
+      }
+      else {
+         egaRenderRect(state.editEGA, _makeRect(mouse, mouse), state.useColors[0]);
+      }
+      break; }
+   case ToolStates_LINES: {
+      state.lastPointPlaced = mouse;
+      egaClearAlpha(state.editEGA);
+      egaRenderLine(state.editEGA, mouse, mouse, state.useColors[0]);
       break; }
    }
    
@@ -397,18 +457,38 @@ static void _doToolMousePressed(BIMPState &state, Int2 mouse) {
 
 static void _doToolMouseReleased(BIMPState &state, Int2 mouse) {
    switch (state.toolState) {
+   case ToolStates_LINES:
+   case ToolStates_RECT:
    case ToolStates_PENCIL: {
+      egaRenderTexture(state.ega, { 0,0 }, state.editEGA);
+      egaClearAlpha(state.editEGA);
       break; }
    }
 }
 
 static void _doToolMouseDown(BIMPState &state, Int2 mouse) {
+   auto &io = ImGui::GetIO();
+
    switch (state.toolState) {
    case ToolStates_PENCIL: {
-      egaRenderLine(state.ega, state.lastMouse, mouse, state.useColors[0]);
+      egaRenderLine(state.editEGA, state.lastMouse, mouse, state.useColors[0]);
       state.lastPointPlaced = mouse;
       break; }
+   case ToolStates_RECT: {
+      egaClearAlpha(state.editEGA);
+      if (io.KeyShift) {
+         egaRenderLineRect(state.editEGA, _makeRect(state.lastPointPlaced, mouse), state.useColors[0]);
+      }
+      else {
+         egaRenderRect(state.editEGA, _makeRect(state.lastPointPlaced, mouse), state.useColors[0]);
+      }
+      break; }
+   case ToolStates_LINES: {
+      egaClearAlpha(state.editEGA);
+      egaRenderLine(state.editEGA, state.lastPointPlaced, mouse, state.useColors[0]);
+      break; }
    }
+
 }
 
 // this function immediately follows the invisibile dummy button for the viewer
@@ -453,8 +533,14 @@ static void _handleInput(BIMPState &state, Float2 pxSize, Float2 cursorPos) {
             if (state.ega) {
                auto c = egaTextureGetColorAt(state.ega, (u32)state.mousePos.x, (u32)state.mousePos.y);
                if (c < EGA_COLOR_UNDEFINED) {
-                  state.popupCLickedColor = c;
-                  ImGui::OpenPopup(POPUPID_COLORPICKER);
+
+                  if (io.KeyCtrl) {
+                     state.popupCLickedColor = c;
+                     ImGui::OpenPopup(POPUPID_COLORPICKER);                     
+                  }
+                  else {
+                     state.useColors[0] = c;
+                  }
                }
             }
          }
@@ -508,11 +594,12 @@ static void _doCustomToolRender(BIMPState &state, ImDrawList *draw_list, ImVec2 
    auto &io = ImGui::GetIO();
    auto mouseScreenPos = io.MousePos;
 
+   auto a = _imageToScreen(Float2{ floorf(state.mousePos.x), floorf(state.mousePos.y) }, state, p);
+   auto b = _imageToScreen(Float2{ floorf(state.mousePos.x + 1), floorf(state.mousePos.y + 1) }, state, p);
+   draw_list->AddRect(a, b, IM_COL32_BLACK);
+
    switch (state.toolState) {
    case ToolStates_PENCIL: {
-      auto a = _imageToScreen(Float2{ floorf(state.mousePos.x), floorf(state.mousePos.y) }, state, p);
-      auto b = _imageToScreen(Float2{ floorf(state.mousePos.x+1), floorf(state.mousePos.y+1) }, state, p);
-      draw_list->AddRect(a, b, IM_COL32_BLACK);
 
       if (io.KeyShift) {
          auto lasta = _imageToScreen(Float2{ (f32)state.lastPointPlaced.x, (f32)state.lastPointPlaced.y }, state, p);
@@ -533,18 +620,35 @@ static void _showStats(BIMPState &state, float viewHeight) {
    auto &imStyle = ImGui::GetStyle();
 
    static float statsCol = 32.0f;
-   ImGui::SetCursorPos(ImVec2(imStyle.WindowPadding.x, imStyle.WindowPadding.y + viewHeight - ImGui::GetTextLineHeight() * 2 - imStyle.WindowPadding.y));
 
-   if (state.mouseInImage) {
+   //ImGui::GetTextLineHeight() * 2
+   auto bottomLeft = ImVec2(imStyle.WindowPadding.x, imStyle.WindowPadding.y + viewHeight);
+
+   ImGui::SetCursorPos(ImVec2(bottomLeft.x, bottomLeft.y - ImGui::GetTextLineHeight()));
+   ImGui::Text(ICON_FA_SEARCH); ImGui::SameLine(statsCol);
+   ImGui::Text("Scale: %.1f%%", state.zoomLevel * 100.0f); //ImGui::SameLine();
+
+   int lineCount = 0;
+
+   if (state.mouseInImage) {      
+      ImGui::SetCursorPos(ImVec2(bottomLeft.x, bottomLeft.y - ImGui::GetTextLineHeight() - ImGui::GetTextLineHeightWithSpacing() * ++lineCount));
       ImGui::Text(ICON_FA_MOUSE_POINTER); ImGui::SameLine(statsCol);
       ImGui::Text("Mouse: (%.1f, %.1f)", state.mousePos.x, state.mousePos.y);
    }
-   else {
-      ImGui::Text("");
+
+   if (state.mouseDown && state.toolState == ToolStates_RECT) {
+      ImGui::SetCursorPos(ImVec2(bottomLeft.x, bottomLeft.y - ImGui::GetTextLineHeight() - ImGui::GetTextLineHeightWithSpacing() * ++lineCount));
+
+      auto txt = format("Region: %d x %d", 
+         labs(state.lastMouse.x - state.lastPointPlaced.x) + 1, 
+         labs(state.lastMouse.y - state.lastPointPlaced.y) + 1);
+
+      ImGui::Text(ICON_FA_EXPAND); ImGui::SameLine(statsCol);
+      ImGui::Text(txt.c_str());
    }
 
-   ImGui::Text(ICON_FA_SEARCH); ImGui::SameLine(statsCol);
-   ImGui::Text("Scale: %.1f%%", state.zoomLevel * 100.0f); //ImGui::SameLine();
+
+   
 }
 
 bool _doUI(Window* wnd, BIMPState &state) {

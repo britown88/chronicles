@@ -267,7 +267,7 @@ static void _mainMenu( Window* wnd) {
       }
 
       if (ImGui::BeginMenu("Tools")) {
-         if (ImGui::MenuItem(ICON_FA_PAINT_BRUSH" BIMP")) {
+         if (ImGui::MenuItem(ICON_FA_PAINT_BRUSH" BIMP (Ctrl+B)")) {
             uiToolStartBIMP(wnd);
          }
 
@@ -275,6 +275,10 @@ static void _mainMenu( Window* wnd) {
       }
 
       ImGui::EndMainMenuBar();
+   }
+
+   if (ImGui::IsKeyPressed(SDL_SCANCODE_B) && ImGui::GetIO().KeyCtrl) {
+      uiToolStartBIMP(wnd);
    }
 }
 
