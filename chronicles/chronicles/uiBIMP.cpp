@@ -253,6 +253,12 @@ static bool _doColorSelectButton(BIMPState &state, u32 idx) {
    return out;
 }
 
+static void _setTool(BIMPState &state, ToolStates tool) {
+   egaClearAlpha(state.editEGA);
+   state.mouseDown = false;
+   state.toolState = tool;
+}
+
 static void _doToolbar(Window* wnd, BIMPState &state) {
    auto &imStyle = ImGui::GetStyle();
 
@@ -374,13 +380,13 @@ static void _doToolbar(Window* wnd, BIMPState &state) {
       }
 
       if (state.ega) {         
-         if (btnPencil) { state.toolState = ToolStates_PENCIL; }
-         if (btnFill) { state.toolState = ToolStates_FLOODFILL; }
+         if (btnPencil) { _setTool(state, ToolStates_PENCIL); }
+         if (btnFill) { _setTool(state, ToolStates_FLOODFILL); }
          if (btnErase) { state.erase = !state.erase; }
-         if (btnColorPicker) { state.toolState = ToolStates_EYEDROP; }
-         if (btnLines) { state.toolState = ToolStates_LINES; }
-         if (btnRect) { state.toolState = ToolStates_RECT; }
-         if (btnRegion) { state.toolState = ToolStates_REGION_PICK; }
+         if (btnColorPicker) { _setTool(state, ToolStates_EYEDROP); }
+         if (btnLines) { _setTool(state, ToolStates_LINES); }
+         if (btnRect) { _setTool(state, ToolStates_RECT); }
+         if (btnRegion) { _setTool(state, ToolStates_REGION_PICK); }
          if (btnCrop) { /*crop*/ }
          if (btnUndo) { _undo(state); }
          if (btnRedo) { _redo(state); }         
@@ -559,6 +565,8 @@ static void _commitEditPlane(BIMPState &state) {
    egaClearAlpha(state.editEGA);
    _saveSnapshot(state);
 }
+
+
 
 static void _doToolMousePressed(BIMPState &state, Int2 mouse) {
    auto &io = ImGui::GetIO();
