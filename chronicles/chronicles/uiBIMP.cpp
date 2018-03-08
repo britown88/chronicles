@@ -87,7 +87,6 @@ static void _saveSnapshot(BIMPState &state) {
       state.history.erase(state.history.begin() + state.historyPosition + 1, state.history.end());
    }
 
-   
    state.history.push_back(egaTextureCreateCopy(state.ega));
    state.historyPosition = state.history.size() - 1;
 }
@@ -563,30 +562,47 @@ static void _commitEditPlane(BIMPState &state) {
 
 static void _doToolMousePressed(BIMPState &state, Int2 mouse) {
    auto &io = ImGui::GetIO();
+
+   auto color = state.erase ? EGA_ALPHA : state.useColors[0];
+
    switch (state.toolState) {
    case ToolStates_PENCIL: {
+      egaClearAlpha(state.editEGA);
+      if (state.erase) { egaRenderTexture(state.editEGA, { 0,0 }, state.ega); }
       if (io.KeyShift) {
-         egaRenderLine(state.editEGA, state.lastPointPlaced, mouse, state.useColors[0]);
+         egaRenderLine(state.editEGA, state.lastPointPlaced, mouse, color);
          state.lastPointPlaced = mouse;
+         if (state.erase) {
+            egaClearAlpha(state.ega);
+         }
          _commitEditPlane(state);
          state.mouseDown = false;
       }
       break; }
+
    case ToolStates_RECT: {
-      state.lastPointPlaced = mouse;
       egaClearAlpha(state.editEGA);
-      if (io.KeyShift) {
-         egaRenderLineRect(state.editEGA, _makeRect(mouse, mouse), state.useColors[0]);
-      }
-      else {
-         egaRenderRect(state.editEGA, _makeRect(mouse, mouse), state.useColors[0]);
-      }
+      if (state.erase) { egaRenderTexture(state.editEGA, { 0,0 }, state.ega); }
+      state.lastPointPlaced = mouse;
+      
+      if (io.KeyShift) { egaRenderLineRect(state.editEGA, _makeRect(mouse, mouse), color); }
+      else { egaRenderRect(state.editEGA, _makeRect(mouse, mouse), color); }
       break; }
+
    case ToolStates_FLOODFILL: {
-      _floodFill(state.ega, mouse, state.useColors[0]);
+      egaClearAlpha(state.editEGA);
+      _floodFill(state.ega, mouse, color);
       state.mouseDown = false;
       _saveSnapshot(state);
       break; }
+   
+   case ToolStates_LINES: {
+      egaClearAlpha(state.editEGA);
+      if (state.erase) { egaRenderTexture(state.editEGA, { 0,0 }, state.ega); }
+      state.lastPointPlaced = mouse;
+      egaRenderLine(state.editEGA, mouse, mouse, color);
+      break; }
+
    case ToolStates_EYEDROP: {
       auto c = egaTextureGetColorAt(state.ega, mouse.x, mouse.y);
       if (c < EGA_PALETTE_COLORS) {
@@ -594,12 +610,6 @@ static void _doToolMousePressed(BIMPState &state, Int2 mouse) {
          state.mouseDown = false;
          state.toolState = ToolStates_PENCIL;
       }
-      
-      break; }
-   case ToolStates_LINES: {
-      state.lastPointPlaced = mouse;
-      egaClearAlpha(state.editEGA);
-      egaRenderLine(state.editEGA, mouse, mouse, state.useColors[0]);
       break; }
    }
    
@@ -610,6 +620,9 @@ static void _doToolMouseReleased(BIMPState &state, Int2 mouse) {
    case ToolStates_LINES:
    case ToolStates_RECT:
    case ToolStates_PENCIL: {
+      if (state.erase) {
+         egaClearAlpha(state.ega);
+      }
       _commitEditPlane(state);
       break; }
    }
@@ -617,24 +630,26 @@ static void _doToolMouseReleased(BIMPState &state, Int2 mouse) {
 
 static void _doToolMouseDown(BIMPState &state, Int2 mouse) {
    auto &io = ImGui::GetIO();
+   auto color = state.erase ? EGA_ALPHA : state.useColors[0];
 
    switch (state.toolState) {
    case ToolStates_PENCIL: {
-      egaRenderLine(state.editEGA, state.lastMouse, mouse, state.useColors[0]);
+      egaRenderLine(state.editEGA, state.lastMouse, mouse, color);
       state.lastPointPlaced = mouse;
       break; }
    case ToolStates_RECT: {
       egaClearAlpha(state.editEGA);
-      if (io.KeyShift) {
-         egaRenderLineRect(state.editEGA, _makeRect(state.lastPointPlaced, mouse), state.useColors[0]);
-      }
-      else {
-         egaRenderRect(state.editEGA, _makeRect(state.lastPointPlaced, mouse), state.useColors[0]);
-      }
+      if (state.erase) { egaRenderTexture(state.editEGA, { 0,0 }, state.ega); }
+
+      if (io.KeyShift) { egaRenderLineRect(state.editEGA, _makeRect(state.lastPointPlaced, mouse), color); }
+      else {  egaRenderRect(state.editEGA, _makeRect(state.lastPointPlaced, mouse), color);  }
+
       break; }
    case ToolStates_LINES: {
       egaClearAlpha(state.editEGA);
-      egaRenderLine(state.editEGA, state.lastPointPlaced, mouse, state.useColors[0]);
+      if (state.erase) { egaRenderTexture(state.editEGA, { 0,0 }, state.ega); }
+
+      egaRenderLine(state.editEGA, state.lastPointPlaced, mouse, color);
       break; }
    }
 
@@ -715,15 +730,17 @@ static void _handleInput(BIMPState &state, Float2 pxSize, Float2 cursorPos) {
       state.lastMouse = m;
    }
 
-   if (ImGui::IsMouseReleased(MOUSE_LEFT) && state.mouseDown) {
-      state.mouseDown = false;
-      _doToolMouseReleased(state, m);
-   }
-
-   if (ImGui::IsMouseDown(MOUSE_LEFT) && state.mouseDown) {  
+   if (ImGui::IsMouseDown(MOUSE_LEFT) && state.mouseDown) {
       _doToolMouseDown(state, m);
       state.lastMouse = m;
    }
+
+   if (ImGui::IsMouseReleased(MOUSE_LEFT) && state.mouseDown) {      
+      _doToolMouseReleased(state, m);
+      state.mouseDown = false;
+   }
+
+   
 }
 
 static ImVec2 _imageToScreen(Float2 imgCoords, BIMPState &state, ImVec2 const &p) {
@@ -868,14 +885,6 @@ bool _doUI(Window* wnd, BIMPState &state) {
             ImDrawList* draw_list = ImGui::GetWindowDrawList();
             const ImVec2 p = ImGui::GetCursorScreenPos();
 
-            // before anything we want to udpate png with the current ega texture
-            if (state.ega) {
-               egaTextureDecode(state.ega, state.pngTex, &state.palette);
-            }
-            if (state.editEGA) {
-               egaTextureDecode(state.editEGA, state.editTex, &state.palette);
-            }
-
             // drawlists use screen coords
             auto a = ImVec2(state.zoomOffset.x + p.x, state.zoomOffset.y + p.y);
             auto b = ImVec2(state.zoomOffset.x + p.x  + drawSize.x*state.zoomLevel, state.zoomOffset.y + p.y + drawSize.y*state.zoomLevel);
@@ -900,10 +909,20 @@ bool _doUI(Window* wnd, BIMPState &state) {
             ImGui::InvisibleButton("##dummy", viewSize);
             _handleInput(state, { pxWidth, pxHeight }, {p.x, p.y});
 
+            //input affects the image so only decode after handling input
+            if (state.ega) { egaTextureDecode(state.ega, state.pngTex, &state.palette); }
+            if (state.editEGA) { egaTextureDecode(state.editEGA, state.editTex, &state.palette); }
+
             // Draw the actual image
-            draw_list->AddImage((ImTextureID)textureGetHandle(state.pngTex), a, b);
+            // in erase mode, while dragging an operation, only render the edit plane
+            bool eraseDrawMode = state.erase && state.ega && state.mouseDown;
+
+            if (!eraseDrawMode) {
+               draw_list->AddImage((ImTextureID)textureGetHandle(state.pngTex), a, b);
+            }            
             if (state.editTex) {
-               draw_list->AddImage((ImTextureID)textureGetHandle(state.editTex), a, b, ImVec2(0,0), ImVec2(1,1), IM_COL32(255,255,255,230));
+               ImU32 editColor = IM_COL32(255, 255, 255, eraseDrawMode ? 255 : 230);
+               draw_list->AddImage((ImTextureID)textureGetHandle(state.editTex), a, b, ImVec2(0,0), ImVec2(1,1), editColor);
             }
 
             // some tools can use some custom rendering
