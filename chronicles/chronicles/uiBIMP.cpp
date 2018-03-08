@@ -95,6 +95,7 @@ static void _undo(BIMPState &state) {
    if (state.historyPosition > 0) {
       --state.historyPosition;
       egaClearAlpha(state.ega);
+      egaClearAlpha(state.editEGA);
       egaRenderTexture(state.ega, { 0,0 }, state.history[state.historyPosition]);
    }
 }
@@ -102,6 +103,7 @@ static void _redo(BIMPState &state) {
    if (state.historyPosition < state.history.size() - 1) {
       ++state.historyPosition;
       egaClearAlpha(state.ega);
+      egaClearAlpha(state.editEGA);
       egaRenderTexture(state.ega, { 0,0 }, state.history[state.historyPosition]);
    }
 }
@@ -553,6 +555,12 @@ static void _floodFill(EGATexture *tex, Int2 mousePoint, EGAPColor c) {
    delete[] visited;
 }
 
+static void _commitEditPlane(BIMPState &state) {
+   egaRenderTexture(state.ega, { 0,0 }, state.editEGA);
+   egaClearAlpha(state.editEGA);
+   _saveSnapshot(state);
+}
+
 static void _doToolMousePressed(BIMPState &state, Int2 mouse) {
    auto &io = ImGui::GetIO();
    switch (state.toolState) {
@@ -560,6 +568,7 @@ static void _doToolMousePressed(BIMPState &state, Int2 mouse) {
       if (io.KeyShift) {
          egaRenderLine(state.editEGA, state.lastPointPlaced, mouse, state.useColors[0]);
          state.lastPointPlaced = mouse;
+         _commitEditPlane(state);
          state.mouseDown = false;
       }
       break; }
@@ -601,9 +610,7 @@ static void _doToolMouseReleased(BIMPState &state, Int2 mouse) {
    case ToolStates_LINES:
    case ToolStates_RECT:
    case ToolStates_PENCIL: {
-      egaRenderTexture(state.ega, { 0,0 }, state.editEGA);
-      egaClearAlpha(state.editEGA);
-      _saveSnapshot(state);
+      _commitEditPlane(state);
       break; }
    }
 }
@@ -690,6 +697,11 @@ static void _handleInput(BIMPState &state, Float2 pxSize, Float2 cursorPos) {
    }
 
    // now we handle actual tool functions, which dont happen if we're holding ctrl
+
+   if (!ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows)) {
+      return;
+   }
+
    if (!state.ega || io.KeyCtrl) {
       state.mouseDown = false;
       return;
@@ -891,7 +903,7 @@ bool _doUI(Window* wnd, BIMPState &state) {
             // Draw the actual image
             draw_list->AddImage((ImTextureID)textureGetHandle(state.pngTex), a, b);
             if (state.editTex) {
-               draw_list->AddImage((ImTextureID)textureGetHandle(state.editTex), a, b);
+               draw_list->AddImage((ImTextureID)textureGetHandle(state.editTex), a, b, ImVec2(0,0), ImVec2(1,1), IM_COL32(255,255,255,230));
             }
 
             // some tools can use some custom rendering
