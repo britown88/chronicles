@@ -657,10 +657,11 @@ void egaRenderTexturePartial(EGATexture *target, Int2 pos, EGATexture *tex, Rect
    }
 
    Recti srcRect = { 0 };
-   srcRect.x = offsetPos.x < 0 ? uv.x - offsetPos.x : uv.x;
-   srcRect.y = offsetPos.y < 0 ? uv.y - offsetPos.y : uv.y;
-   srcRect.w = MIN(vp->w, MIN(vp->w - offsetPos.x, uv.w - srcRect.x));
-   srcRect.h = MIN(vp->h, MIN(vp->h - offsetPos.y, uv.h - srcRect.y));
+   srcRect.x = pos.x < 0 ? uv.x - pos.x : uv.x;
+   srcRect.y = pos.y < 0 ? uv.y - pos.y : uv.y;
+
+   srcRect.w = MIN(vp->w, MIN(uv.w, uv.w - (srcRect.x - uv.x) ));
+   srcRect.h = MIN(vp->h, MIN(uv.h, uv.h - (srcRect.y - uv.y)));
 
    Int2 destPos = { 0 };
    destPos.x = offsetPos.x < 0 ? 0 : pos.x;

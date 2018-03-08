@@ -38,6 +38,9 @@ struct BIMPState {
    Texture* editTex = nullptr;
    EGATexture *editEGA = nullptr;
 
+   EGATexture *snippet = nullptr;
+   Int2 snippetPosition = { 0, 0 };
+
    EGAPalette palette;
    char palName[64];
 
@@ -65,6 +68,35 @@ struct BIMPState {
    size_t historyPosition = 0;
 };
 
+
+static void _stateTexCleanup(BIMPState &state) {
+   if (state.pngTex) {
+      textureDestroy(state.pngTex);
+      state.pngTex = nullptr;
+   }
+
+   if (state.ega) {
+      egaTextureDestroy(state.ega);
+      state.ega = nullptr;
+   }
+
+   if (state.editTex) {
+      textureDestroy(state.editTex);
+      state.editTex = nullptr;
+   }
+
+   if (state.editEGA) {
+      egaTextureDestroy(state.editEGA);
+      state.editEGA = nullptr;
+   }
+
+   if (state.snippet) {
+      egaTextureDestroy(state.snippet);
+      state.snippet = nullptr;
+   }
+}
+
+
 static void _cleanupHistory(BIMPState &state) {
    for (auto hist : state.history) {
       egaTextureDestroy(hist);
@@ -75,6 +107,7 @@ static void _cleanupHistory(BIMPState &state) {
 
 static void _stateDestroy(BIMPState &state) {
    _cleanupHistory(state);
+   _stateTexCleanup(state);
 }
 
 
@@ -109,28 +142,6 @@ static void _redo(BIMPState &state) {
 
 static std::string _genWinTitle(BIMPState *state) {
    return format("%s BIMP - Brandon's Image Manipulation Program###BIMP%p", ICON_FA_PAINT_BRUSH, state);
-}
-
-static void _stateTexCleanup(BIMPState &state) {
-   if (state.pngTex) {
-      textureDestroy(state.pngTex);
-      state.pngTex = nullptr;
-   }
-
-   if (state.ega) {
-      egaTextureDestroy(state.ega);
-      state.ega = nullptr;
-   }
-
-   if (state.editTex) {
-      textureDestroy(state.editTex);
-      state.editTex = nullptr;
-   }
-
-   if (state.editEGA) {
-      egaTextureDestroy(state.editEGA);
-      state.editEGA = nullptr;
-   }
 }
 
 static void _refreshEditTextures(BIMPState &state) {
@@ -369,7 +380,7 @@ static void _doToolbar(Window* wnd, BIMPState &state) {
          if (ImGui::IsKeyPressed(SDL_SCANCODE_C)) { btnColorPicker = true; }
          if (ImGui::IsKeyPressed(SDL_SCANCODE_L)) { btnLines = true; }
          if (ImGui::IsKeyPressed(SDL_SCANCODE_R)) { btnRect = true; }
-         if (ImGui::IsKeyPressed(SDL_SCANCODE_R) && io.KeyShift) { regionState = true; }
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_R) && io.KeyShift) { btnRegion = true; }
          if (ImGui::IsKeyPressed(SDL_SCANCODE_C) && io.KeyShift) { btnCrop = true; }
          if (ImGui::IsKeyPressed(SDL_SCANCODE_N) && io.KeyCtrl) { btnNew = true; }
          if (ImGui::IsKeyPressed(SDL_SCANCODE_L) && io.KeyCtrl) { btnLoad = true; }
@@ -500,7 +511,6 @@ static Recti _makeRect(Int2 const &a, Int2 const &b) {
    return { MIN(a.x, b.x), MIN(a.y, b.y), labs(b.x - a.x) + 1,  labs(b.y - a.y) + 1 };
 }
 
-
 static void _floodFill(EGATexture *tex, Int2 mousePoint, EGAPColor c) {
    auto texSize = egaTextureGetSize(tex);
    auto pixelCount = texSize.x * texSize.y;
@@ -566,14 +576,16 @@ static void _commitEditPlane(BIMPState &state) {
    _saveSnapshot(state);
 }
 
-
-
 static void _doToolMousePressed(BIMPState &state, Int2 mouse) {
    auto &io = ImGui::GetIO();
 
    auto color = state.erase ? EGA_ALPHA : state.useColors[0];
 
    switch (state.toolState) {
+   case ToolStates_REGION_PICK:
+      state.lastPointPlaced = mouse;
+      break;
+
    case ToolStates_PENCIL: {
       egaClearAlpha(state.editEGA);
       if (state.erase) { egaRenderTexture(state.editEGA, { 0,0 }, state.ega); }
@@ -623,8 +635,28 @@ static void _doToolMousePressed(BIMPState &state, Int2 mouse) {
    
 }
 
+static void _cutSnippet(BIMPState &state, Int2 mouse) {
+   auto snippetRegion = _makeRect(state.lastPointPlaced, mouse);
+   if (state.snippet) {
+      egaTextureDestroy(state.snippet);
+   }
+
+   state.snippetPosition = { snippetRegion.x, snippetRegion.y };
+   state.snippet = egaTextureCreate(snippetRegion.w, snippetRegion.h);
+   egaClearAlpha(state.snippet);
+
+   egaRenderTexturePartial(state.snippet, { 0,0 }, state.ega, snippetRegion);
+   egaRenderRect(state.ega, snippetRegion, EGA_ALPHA);
+   egaClearAlpha(state.editEGA);
+   egaRenderTexture(state.editEGA, state.snippetPosition, state.snippet);
+}
+
 static void _doToolMouseReleased(BIMPState &state, Int2 mouse) {
    switch (state.toolState) {
+   case ToolStates_REGION_PICK:
+      _cutSnippet(state, mouse);
+      state.toolState = ToolStates_REGION_PICKED;
+      break;
    case ToolStates_LINES:
    case ToolStates_RECT:
    case ToolStates_PENCIL: {
@@ -765,6 +797,13 @@ static ImVec2 _imageToScreen(Float2 imgCoords, BIMPState &state, ImVec2 const &p
       imgCoords.y * pxHeight * state.zoomLevel + p.y + state.zoomOffset.y };
 }
 
+static void _makeGuideRect(BIMPState &state, ImVec2 const &p, Float2 a_in, Float2 b_in, ImVec2 &a_out, ImVec2 &b_out) {
+   Float2 min = { MIN(a_in.x, b_in.x), MIN(a_in.y,  b_in.y) };
+   Float2 max = { MAX(a_in.x,  b_in.x) + 1, MAX(a_in.y,  b_in.y) + 1 };
+   a_out = _imageToScreen(min, state, p);
+   b_out = _imageToScreen(max, state, p);
+}
+
 static void _doCustomToolRender(BIMPState &state, ImDrawList *draw_list, ImVec2 const &p) {
    if (!state.ega || !state.mouseInImage) {
       return;
@@ -781,7 +820,6 @@ static void _doCustomToolRender(BIMPState &state, ImDrawList *draw_list, ImVec2 
 
    switch (state.toolState) {
    case ToolStates_PENCIL: {
-
       if (io.KeyShift) {
          auto lasta = _imageToScreen(Float2{ (f32)state.lastPointPlaced.x, (f32)state.lastPointPlaced.y }, state, p);
          auto lastb = _imageToScreen(Float2{ (f32)state.lastPointPlaced.x + 1, (f32)state.lastPointPlaced.y + 1 }, state, p);
@@ -793,16 +831,23 @@ static void _doCustomToolRender(BIMPState &state, ImDrawList *draw_list, ImVec2 
       }
 
       break; }
+   case ToolStates_REGION_PICKED: {
+      auto snippetSize = egaTextureGetSize(state.snippet);
+      ImVec2 a = _imageToScreen({ (f32)state.snippetPosition.x, (f32)state.snippetPosition.y }, state, p);
+      ImVec2 b = _imageToScreen({ (f32)state.snippetPosition.x + snippetSize.x, (f32)state.snippetPosition.y + snippetSize.y }, state, p);
+      
+      draw_list->AddRectFilled(a, b, IM_COL32(255, 255, 255, 32));
+      draw_list->AddRect(a, b, guideCol, 1.0f, ImDrawCornerFlags_All, 1.5f);
+      break;}
+   case ToolStates_REGION_PICK:
    case ToolStates_RECT: {
       if (state.mouseDown) {
-         Float2 min = { MIN(state.lastPointPlaced.x, floorf(state.mousePos.x)), MIN(state.lastPointPlaced.y, floorf(state.mousePos.y)) };
-         Float2 max = { MAX(state.lastPointPlaced.x, floorf(state.mousePos.x)) + 1, MAX(state.lastPointPlaced.y, floorf(state.mousePos.y)) + 1 };
-
-         auto a = _imageToScreen(min, state, p);
-         auto b = _imageToScreen(max, state, p);
+         ImVec2 a, b;
+         _makeGuideRect(state, p,
+            { (f32)state.lastPointPlaced.x, (f32)state.lastPointPlaced.y },
+            { floorf(state.mousePos.x) , floorf(state.mousePos.y) }, a, b);
 
          draw_list->AddRect(a, b, guideCol, 1.0f, ImDrawCornerFlags_All, 1.5f);
-
       }
       break; }   
    case ToolStates_LINES: {
