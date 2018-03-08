@@ -787,8 +787,12 @@ static void _doCustomToolRender(BIMPState &state, ImDrawList *draw_list, ImVec2 
       break; }
    case ToolStates_RECT: {
       if (state.mouseDown) {
-         auto a = _imageToScreen(Float2{ (f32)state.lastPointPlaced.x, (f32)state.lastPointPlaced.y }, state, p);
-         auto b = _imageToScreen(Float2{ floorf(state.mousePos.x + 1), floorf(state.mousePos.y + 1) }, state, p);
+         Float2 min = { MIN(state.lastPointPlaced.x, floorf(state.mousePos.x)), MIN(state.lastPointPlaced.y, floorf(state.mousePos.y)) };
+         Float2 max = { MAX(state.lastPointPlaced.x, floorf(state.mousePos.x)) + 1, MAX(state.lastPointPlaced.y, floorf(state.mousePos.y)) + 1 };
+
+         auto a = _imageToScreen(min, state, p);
+         auto b = _imageToScreen(max, state, p);
+
          draw_list->AddRect(a, b, guideCol, 1.0f, ImDrawCornerFlags_All, 1.5f);
 
       }
