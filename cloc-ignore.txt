@@ -1,0 +1,4 @@
+chronicles/chronicles/IconsFontAwesome.h
+chronicles/chronicles/fa_merged.cpp
+chronicles/chronicles/Debug
+chronicles/chronicles/x64

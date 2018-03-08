@@ -1,0 +1,1 @@
+cloc.exe --exclude-ext=bin,ini,vcxproj,filters --exclude-list-file=cloc-ignore.txt chronicles/chronicles/
