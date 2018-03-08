@@ -585,6 +585,25 @@ static void _doToolMousePressed(BIMPState &state, Int2 mouse) {
    case ToolStates_REGION_PICK:
       state.lastPointPlaced = mouse;
       break;
+   case ToolStates_REGION_PICKED: {
+      auto snipSize = egaTextureGetSize(state.snippet);
+      Recti region = {
+         state.snippetPosition.x, state.snippetPosition.y,
+         snipSize.x, snipSize.y
+      };
+
+      if (mouse.x >= region.x && mouse.y >= region.y && 
+         mouse.x < region.x + region.w && mouse.y < region.y + region.h) {
+         state.lastPointPlaced = { mouse.x - region.x, mouse.y - region.y };
+
+      }
+      else {
+         _commitEditPlane(state);
+         state.lastPointPlaced = mouse;
+         state.toolState = ToolStates_REGION_PICK;
+      }
+
+      break; }
 
    case ToolStates_PENCIL: {
       egaClearAlpha(state.editEGA);
@@ -673,6 +692,11 @@ static void _doToolMouseDown(BIMPState &state, Int2 mouse) {
    auto color = state.erase ? EGA_ALPHA : state.useColors[0];
 
    switch (state.toolState) {
+   case ToolStates_REGION_PICKED: {
+      egaClearAlpha(state.editEGA);
+      state.snippetPosition = { mouse.x - state.lastPointPlaced.x, mouse.y - state.lastPointPlaced.y };
+      egaRenderTexture(state.editEGA, state.snippetPosition, state.snippet);
+      break; }
    case ToolStates_PENCIL: {
       egaRenderLine(state.editEGA, state.lastMouse, mouse, color);
       state.lastPointPlaced = mouse;
