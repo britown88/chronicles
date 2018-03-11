@@ -193,7 +193,7 @@ static bool _doSCFTest(Window* wnd, SCFTestState& state) {
 
 static void _mainMenu( Window* wnd) {
    auto game = gameGet();
-   if (ImGui::BeginMainMenuBar()) {
+   if (ImGui::BeginMenuBar()) {
       if (ImGui::BeginMenu("Debug")) {
 
          ImGui::ColorEdit4("Clear Color", (float*)&game->imgui.bgClearColor);
@@ -268,17 +268,17 @@ static void _mainMenu( Window* wnd) {
 
       if (ImGui::BeginMenu("Tools")) {
          if (ImGui::MenuItem(ICON_FA_PAINT_BRUSH" BIMP (Ctrl+B)")) {
-            uiToolStartBIMP(wnd);
+            uiBimpStart(wnd);
          }
 
          ImGui::EndMenu();
       }
 
-      ImGui::EndMainMenuBar();
+      ImGui::EndMenuBar();
    }
 
    if (ImGui::IsKeyPressed(SDL_SCANCODE_B) && ImGui::GetIO().KeyCtrl) {
-      uiToolStartBIMP(wnd);
+      uiBimpStart(wnd);
    }
 }
 
@@ -935,9 +935,48 @@ void gameDoUI(Window* wnd) {
    
 
    if (game->imgui.showUI) {
-      _mainMenu(wnd);
-      _doStatsWindow(wnd);
-      _showWindowedViewer(wnd);
+      auto game = gameGet();
+      auto sz = windowSize(wnd);
+      auto &style = ImGui::GetStyle();
+
+      auto bgColor = ImGui::GetStyleColorVec4(ImGuiCol_WindowBg);
+      ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32_BLACK_TRANS);
+
+      auto winPadding = style.WindowPadding;
+      auto borderSize = style.WindowBorderSize;
+      auto rounding = style.WindowRounding;
+
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2());
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+      ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+
+      ImGui::SetNextWindowPos(ImVec2(), ImGuiCond_Always);      
+      ImGui::SetNextWindowSize(ImVec2((float)sz.x, (float)sz.y), ImGuiCond_Always);
+
+      if (ImGui::Begin("Root", nullptr, BorderlessFlags | ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoBringToFrontOnFocus)) {    
+         ImGui::Dummy(ImVec2(sz.x, sz.y));
+         uiBimpHandleDrop(wnd);
+
+         ImGui::PushStyleColor(ImGuiCol_WindowBg, bgColor);
+
+         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, winPadding);
+         ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, borderSize);
+         ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, rounding);
+
+         _mainMenu(wnd);
+         
+         _doStatsWindow(wnd);
+         _showWindowedViewer(wnd);
+
+         ImGui::PopStyleVar(3);
+         ImGui::PopStyleColor();
+      }
+      ImGui::End();
+
+      ImGui::PopStyleColor();
+      ImGui::PopStyleVar(3);
+
+      
    }
    else {
       _showFullScreenViewer(wnd);

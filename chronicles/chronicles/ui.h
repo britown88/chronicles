@@ -12,7 +12,9 @@ struct uiDragDropPalColor {
 
 typedef struct Window Window;
 typedef struct GameData GameData;
-void uiToolStartBIMP(Window* wnd);
+void uiBimpStart(Window* wnd); 
+void uiBimpHandleDrop(Window* wnd);
+void uiBimpStartEX(Window* wnd, EGATexture const *texture, EGAPalette *palette, Float2 cursorPos);
 
 enum PaletteEditorFlags_ {
    PaletteEditorFlags_ENCODE = (1 << 0), // adds encode sentinel values to color picker

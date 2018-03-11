@@ -45,7 +45,7 @@ extern ColorRGB g_egaToRGBTable[64];
 typedef struct EGATexture EGATexture;
 
 EGATexture *egaTextureCreate(u32 width, u32 height);
-EGATexture *egaTextureCreateCopy(EGATexture *other);
+EGATexture *egaTextureCreateCopy(EGATexture const *other);
 void egaTextureDestroy(EGATexture *self);
 
 // encoding and decoding from an rgb texture
@@ -59,7 +59,7 @@ int egaTextureDecode(EGATexture *self, Texture* target, EGAPalette *palette);
 int egaTextureSerialize(EGATexture *self, byte **outBuff, u64 *size);
 EGATexture *egaTextureDeserialize(byte *buff, u64 size);
 
-Int2 egaTextureGetSize(EGATexture *self);
+Int2 egaTextureGetSize(EGATexture const *self);
 
 void egaTextureResize(EGATexture *self, u32 width, u32 height);
 

@@ -20,7 +20,8 @@
 #define STORAGE_NEW_SIZE_Y 1
 
 enum ToolStates_ {
-   ToolStates_PENCIL = 0,
+   ToolStates_NONE = 0,
+   ToolStates_PENCIL,
    ToolStates_LINES,
    ToolStates_RECT,
    ToolStates_FLOODFILL,
@@ -32,6 +33,8 @@ typedef byte ToolStates;
 
 
 struct BIMPState {
+
+   bool fitRectAfterFirstFrame = false;
 
    Texture* pngTex = nullptr;
    EGATexture *ega = nullptr;
@@ -46,7 +49,7 @@ struct BIMPState {
    EGAPalette palette;
    char palName[64];
 
-   ToolStates toolState =  ToolStates_PENCIL;
+   ToolStates toolState = ToolStates_NONE;
    EGAPColor popupCLickedColor = 0; // for color picker popup
    Float2 mousePos = { 0 }; //mouse positon within the image coords (updated per frame)
    bool mouseInImage = false; //helper boolean for every frame
@@ -867,8 +870,10 @@ static void _doToolMouseDown(BIMPState &state, Int2 mouse) {
 
 struct SnippetPayload {
    EGATexture *snippet = nullptr;
+   EGAPalette *palette = nullptr;
    Int2 dragPos = { 0,0 };
 };
+
 
 // this function immediately follows the invisibile dummy button for the viewer
 // all handling of mouse/keyboard for interactions with the viewer should go here!
@@ -883,7 +888,7 @@ static void _handleInput(BIMPState &state, Float2 pxSize, Float2 cursorPos) {
             if (snip->snippet != state.snippet) {
                if (!payload->Delivery) {
                   _exitRegionPicked(state);
-                  state.toolState = ToolStates_PENCIL;
+                  state.toolState = ToolStates_NONE;
 
                   egaClearAlpha(state.editEGA);
                   egaRenderTexture(state.editEGA,
@@ -910,7 +915,7 @@ static void _handleInput(BIMPState &state, Float2 pxSize, Float2 cursorPos) {
 
    if (state.toolState == ToolStates_REGION_PICKED) {
       if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoDisableHover)) {
-         SnippetPayload pload = { state.snippet, state.lastPointPlaced };
+         SnippetPayload pload = { state.snippet, &state.palette, state.lastPointPlaced };
          ImGui::SetDragDropPayload(UI_DRAGDROP_SNIPPET, &pload, sizeof(pload), ImGuiCond_Once);
          ImGui::EndDragDropSource();
       }
@@ -1205,13 +1210,17 @@ bool _doUI(Window* wnd, BIMPState &state) {
       }
       ImGui::EndChild();
 
+      if (state.fitRectAfterFirstFrame) {
+         state.fitRectAfterFirstFrame = false;
+         _fitToWindow(state);
+      }
    }
    ImGui::End();
 
    return p_open;
 }
 
-void uiToolStartBIMP( Window* wnd) {
+void uiBimpStart( Window* wnd) {
    auto game = gameGet();
    BIMPState *state = new BIMPState();
 
@@ -1229,3 +1238,45 @@ void uiToolStartBIMP( Window* wnd) {
       return ret;
    });
 }
+
+void uiBimpHandleDrop(Window* wnd) {
+   if (ImGui::BeginDragDropTarget()) {
+      if (auto payload = ImGui::AcceptDragDropPayload(UI_DRAGDROP_SNIPPET)) {
+         auto snip = (SnippetPayload*)payload->Data;
+         auto m = ImGui::GetMousePos();
+         uiBimpStartEX(wnd, snip->snippet, snip->palette, {m.x, m.y});
+      }
+      ImGui::EndDragDropTarget();
+   }
+}
+
+void uiBimpStartEX(Window* wnd, EGATexture const *texture, EGAPalette *palette, Float2 cursorPos) {
+   auto game = gameGet();
+   BIMPState *state = new BIMPState();
+
+   strcpy(state->palName, "default");
+   state->palette = *palette;
+
+   state->winName = _genWinTitle(state);
+
+   auto inSize = egaTextureGetSize(texture);
+   state->pngTex = textureCreateCustom(inSize.x, inSize.y, { RepeatType_CLAMP, FilterType_NEAREST });
+   state->ega = egaTextureCreateCopy(texture);
+   _refreshEditTextures(*state);
+   state->fitRectAfterFirstFrame = true;
+
+   _saveSnapshot(*state);
+
+   windowAddGUI(wnd, state->winName.c_str(), [=](Window*wnd) mutable {
+      ImGui::SetNextWindowPos(ImVec2(cursorPos.x, cursorPos.y), ImGuiCond_Appearing);
+      bool ret = _doUI(wnd, *state);
+      if (!ret) {
+         _stateDestroy(*state);
+         delete state;
+      }
+      return ret;
+   });
+
+}
+
+

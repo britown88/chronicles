@@ -92,7 +92,7 @@ EGATexture *egaTextureCreate(u32 width, u32 height) {
 
    return self;
 }
-EGATexture *egaTextureCreateCopy(EGATexture *other) {
+EGATexture *egaTextureCreateCopy(EGATexture const *other) {
    auto out = egaTextureCreate(other->w, other->h);
    memcpy(out->pixelData, other->pixelData, out->pixelCount);
    return out;
@@ -571,7 +571,7 @@ void egaTextureResize(EGATexture *self, u32 width, u32 height) {
    self->dirty = Tex_ALL_DIRTY;
 }
 
-Int2 egaTextureGetSize(EGATexture *self) { return { (i32)self->w, (i32)self->h }; }
+Int2 egaTextureGetSize(EGATexture const *self) { return { (i32)self->w, (i32)self->h }; }
 EGARegion *egaTextureGetFullRegion(EGATexture *self) { return &self->fullRegion; }
 
 EGAPColor egaTextureGetColorAt(EGATexture *self, u32 x, u32 y, EGARegion *vp) {
