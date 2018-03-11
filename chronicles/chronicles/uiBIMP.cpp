@@ -943,15 +943,21 @@ static void _handleInput(BIMPState &state, Float2 pxSize, Float2 cursorPos) {
       if (state.mouseInImage) {
          if (ImGui::IsMouseClicked(MOUSE_RIGHT)) {
             if (state.ega) {
-               auto c = egaTextureGetColorAt(state.ega, (u32)state.mousePos.x, (u32)state.mousePos.y);
-               if (c < EGA_COLOR_UNDEFINED) {
+               if (state.toolState == ToolStates_REGION_PICKED) {
+                  _commitEditPlane(state);
+                  _exitRegionPicked(state);
+               }
+               else {
+                  auto c = egaTextureGetColorAt(state.ega, (u32)state.mousePos.x, (u32)state.mousePos.y);
+                  if (c < EGA_COLOR_UNDEFINED) {
 
-                  if (io.KeyCtrl) {
-                     state.popupCLickedColor = c;
-                     ImGui::OpenPopup(POPUPID_COLORPICKER);                     
-                  }
-                  else {
-                     state.useColors[0] = c;
+                     if (io.KeyCtrl) {
+                        state.popupCLickedColor = c;
+                        ImGui::OpenPopup(POPUPID_COLORPICKER);
+                     }
+                     else {
+                        state.useColors[0] = c;
+                     }
                   }
                }
             }
