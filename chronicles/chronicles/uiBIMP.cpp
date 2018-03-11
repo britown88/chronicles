@@ -24,7 +24,6 @@ enum ToolStates_ {
    ToolStates_EYEDROP,
    ToolStates_REGION_PICK,
    ToolStates_REGION_PICKED,
-   ToolStates_REGION_DRAG,
 };
 typedef byte ToolStates;
 
@@ -68,7 +67,6 @@ struct BIMPState {
    size_t historyPosition = 0;
 };
 
-
 static void _stateTexCleanup(BIMPState &state) {
    if (state.pngTex) {
       textureDestroy(state.pngTex);
@@ -96,7 +94,6 @@ static void _stateTexCleanup(BIMPState &state) {
    }
 }
 
-
 static void _cleanupHistory(BIMPState &state) {
    for (auto hist : state.history) {
       egaTextureDestroy(hist);
@@ -108,6 +105,16 @@ static void _cleanupHistory(BIMPState &state) {
 static void _stateDestroy(BIMPState &state) {
    _cleanupHistory(state);
    _stateTexCleanup(state);
+}
+
+static void _exitRegionPicked(BIMPState &state) {
+   if (state.toolState == ToolStates_REGION_PICKED) {
+      if (state.snippet) {
+         egaTextureDestroy(state.snippet);
+         state.snippet = nullptr;
+      }
+      state.toolState = ToolStates_REGION_PICK;
+   }
 }
 
 
@@ -125,14 +132,20 @@ static void _saveSnapshot(BIMPState &state) {
 }
 static void _undo(BIMPState &state) {
    if (state.historyPosition > 0) {
+      _exitRegionPicked(state);
+
       --state.historyPosition;
       egaClearAlpha(state.ega);
       egaClearAlpha(state.editEGA);
       egaRenderTexture(state.ega, { 0,0 }, state.history[state.historyPosition]);
+
+      
    }
 }
 static void _redo(BIMPState &state) {
    if (state.historyPosition < state.history.size() - 1) {
+      _exitRegionPicked(state);
+
       ++state.historyPosition;
       egaClearAlpha(state.ega);
       egaClearAlpha(state.editEGA);
@@ -265,6 +278,7 @@ static bool _doColorSelectButton(BIMPState &state, u32 idx) {
 }
 
 static void _setTool(BIMPState &state, ToolStates tool) {
+   _exitRegionPicked(state);
    egaClearAlpha(state.editEGA);
    state.mouseDown = false;
    state.toolState = tool;
@@ -600,7 +614,7 @@ static void _doToolMousePressed(BIMPState &state, Int2 mouse) {
       else {
          _commitEditPlane(state);
          state.lastPointPlaced = mouse;
-         state.toolState = ToolStates_REGION_PICK;
+         _exitRegionPicked(state);
       }
 
       break; }
@@ -659,6 +673,8 @@ static void _cutSnippet(BIMPState &state, Int2 mouse) {
    if (state.snippet) {
       egaTextureDestroy(state.snippet);
    }
+
+   _saveSnapshot(state);
 
    state.snippetPosition = { snippetRegion.x, snippetRegion.y };
    state.snippet = egaTextureCreate(snippetRegion.w, snippetRegion.h);
@@ -909,7 +925,7 @@ static void _showStats(BIMPState &state, float viewHeight) {
       ImGui::Text("Mouse: (%.1f, %.1f)", state.mousePos.x, state.mousePos.y);
    }
 
-   if (state.mouseDown && state.toolState == ToolStates_RECT) {
+   if (state.mouseDown && (state.toolState == ToolStates_RECT || state.toolState == ToolStates_REGION_PICK)) {
       ImGui::SetCursorPos(ImVec2(bottomLeft.x, bottomLeft.y - ImGui::GetTextLineHeight() - ImGui::GetTextLineHeightWithSpacing() * ++lineCount));
 
       auto txt = format("Region: %d x %d", 
