@@ -3,6 +3,7 @@
 #include "ega.h"
 
 #define UI_DRAGDROP_PALCOLOR "EGAPALCOLOR"
+#define UI_DRAGDROP_SNIPPET "EGASNIPPET"
 
 struct uiDragDropPalColor {
    EGAColor color;         // 0-63

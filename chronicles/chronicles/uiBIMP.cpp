@@ -849,22 +849,55 @@ static void _doToolMouseDown(BIMPState &state, Int2 mouse) {
 
 }
 
+struct SnippetPayload {
+   EGATexture *snippet = nullptr;
+   Int2 dragPos = { 0,0 };
+};
+
 // this function immediately follows the invisibile dummy button for the viewer
 // all handling of mouse/keyboard for interactions with the viewer should go here!
 static void _handleInput(BIMPState &state, Float2 pxSize, Float2 cursorPos) {
    auto &io = ImGui::GetIO();
 
-   if (ImGui::BeginDragDropTarget()) {
-      if (auto payload = ImGui::AcceptDragDropPayload(UI_DRAGDROP_PALCOLOR)) {
-         if (state.ega && state.mouseInImage) {
-            auto c = egaTextureGetColorAt(state.ega, (u32)state.mousePos.x, (u32)state.mousePos.y);
-            if (c < EGA_COLOR_UNDEFINED) {
-               auto plData = (uiDragDropPalColor*)payload->Data;
-               state.palette.colors[c] = plData->color;
+   if (state.ega) {
+      if (ImGui::BeginDragDropTarget()) {
+         if (auto payload = ImGui::AcceptDragDropPayload(UI_DRAGDROP_SNIPPET, ImGuiDragDropFlags_AcceptBeforeDelivery)) {
+            auto snip = (SnippetPayload*)payload->Data;
+
+            if (snip->snippet != state.snippet) {
+               if (!payload->Delivery) {
+                  _exitRegionPicked(state);
+                  state.toolState = ToolStates_PENCIL;
+
+                  egaClearAlpha(state.editEGA);
+                  egaRenderTexture(state.editEGA,
+                     {  (i32)state.mousePos.x - snip->dragPos.x, 
+                     (i32)state.mousePos.y - snip->dragPos.y }, snip->snippet);
+               }
+               else {
+                  _exitRegionPicked(state);
+                  state.toolState = ToolStates_REGION_PICKED;
+                  state.snippetPosition =
+                  {  (i32)state.mousePos.x - snip->dragPos.x,
+                     (i32)state.mousePos.y - snip->dragPos.y };
+
+                  state.snippet = egaTextureCreateCopy(snip->snippet);
+               }
+
+               
+               //_saveSnapshot(state);
             }
          }
+         ImGui::EndDragDropTarget();
       }
-      ImGui::EndDragDropTarget();
+   }   
+
+   if (state.toolState == ToolStates_REGION_PICKED) {
+      if (ImGui::BeginDragDropSource(ImGuiDragDropFlags_SourceNoDisableHover)) {
+         SnippetPayload pload = { state.snippet, state.lastPointPlaced };
+         ImGui::SetDragDropPayload(UI_DRAGDROP_SNIPPET, &pload, sizeof(pload), ImGuiCond_Once);
+         ImGui::EndDragDropSource();
+      }
    }
 
    // clicked actions
