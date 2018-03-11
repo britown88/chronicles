@@ -16,6 +16,9 @@
 
 #define POPUPID_COLORPICKER "egapicker"
 
+#define STORAGE_NEW_SIZE_X 0
+#define STORAGE_NEW_SIZE_Y 1
+
 enum ToolStates_ {
    ToolStates_PENCIL = 0,
    ToolStates_LINES,
@@ -54,7 +57,6 @@ struct BIMPState {
    float zoomLevel = 1.0f;
    Int2 zoomOffset = {};
    Float2 windowSize = { 0 }; //set every frame
-   Int2 enteredSize = { 32, 32 }; // for holding onto size selection
 
    bool egaStretch = false;
    ImVec4 bgColor;
@@ -117,6 +119,25 @@ static void _exitRegionPicked(BIMPState &state) {
    }
 }
 
+static void _resizeTextures(BIMPState &state, Int2 newSize) {
+   if (state.pngTex) {
+      textureDestroy(state.pngTex);
+      state.pngTex = textureCreateCustom(newSize.x, newSize.y, {RepeatType_CLAMP, FilterType_NEAREST});
+   }
+
+   if (state.ega) {
+      egaTextureResize(state.ega, newSize.x, newSize.y);
+   }
+
+   if (state.editTex) {
+      textureDestroy(state.editTex);
+      state.editTex = textureCreateCustom(newSize.x, newSize.y, { RepeatType_CLAMP, FilterType_NEAREST });
+   }
+
+   if (state.editEGA) {
+      egaTextureResize(state.editEGA, newSize.x, newSize.y);
+   }
+}
 
 static void _saveSnapshot(BIMPState &state) {
 
@@ -133,24 +154,60 @@ static void _saveSnapshot(BIMPState &state) {
 static void _undo(BIMPState &state) {
    if (state.historyPosition > 0) {
       _exitRegionPicked(state);
-
       --state.historyPosition;
+
+      auto revision = state.history[state.historyPosition];
+      auto revSize = egaTextureGetSize(revision);
+      auto curSize = egaTextureGetSize(state.ega);
+      if (revSize.x != curSize.x || revSize.y != curSize.y) {
+         _resizeTextures(state, revSize);
+      }
+
       egaClearAlpha(state.ega);
       egaClearAlpha(state.editEGA);
-      egaRenderTexture(state.ega, { 0,0 }, state.history[state.historyPosition]);
-
+      egaRenderTexture(state.ega, { 0,0 }, revision);
       
    }
 }
 static void _redo(BIMPState &state) {
    if (state.historyPosition < state.history.size() - 1) {
       _exitRegionPicked(state);
-
       ++state.historyPosition;
+
+      auto revision = state.history[state.historyPosition];
+      auto revSize = egaTextureGetSize(revision);
+      auto curSize = egaTextureGetSize(state.ega);
+      if (revSize.x != curSize.x || revSize.y != curSize.y) {
+         _resizeTextures(state, revSize);
+      }
+
       egaClearAlpha(state.ega);
       egaClearAlpha(state.editEGA);
-      egaRenderTexture(state.ega, { 0,0 }, state.history[state.historyPosition]);
+      egaRenderTexture(state.ega, { 0,0 }, revision);
    }
+}
+
+static void _resize(BIMPState &state, Int2 newSize) {
+   auto curSize = egaTextureGetSize(state.ega);
+   if (newSize.x != curSize.x || newSize.y != curSize.y) {
+      //_exitRegionPicked(state);
+      _resizeTextures(state, newSize);
+      _saveSnapshot(state);
+   }
+}
+
+static void _cropToSnippet(BIMPState &state) {
+   auto curSize = egaTextureGetSize(state.ega);
+   auto snipSize = egaTextureGetSize(state.snippet);
+   if (snipSize.x != curSize.x || snipSize.y != curSize.y) {
+      _resizeTextures(state, snipSize);
+   }
+
+   egaClearAlpha(state.ega);
+   egaClearAlpha(state.editEGA);
+   egaRenderTexture(state.ega, { 0,0 }, state.snippet);
+   _exitRegionPicked(state);
+   _saveSnapshot(state);
 }
 
 static std::string _genWinTitle(BIMPState *state) {
@@ -218,7 +275,6 @@ static void _loadPNG(BIMPState &state) {
       auto palName = pathGetFilename(png.c_str());
       strcpy(state.palName, palName.c_str());
 
-      state.enteredSize = textureGetSize(state.pngTex);
       _fitToWindow(state);
    }
 }
@@ -362,8 +418,15 @@ static void _doToolbar(Window* wnd, BIMPState &state) {
       bool btnRegion = ImGui::Button(ICON_FA_EXPAND " Region Select");
       if (ImGui::IsItemHovered()) { ImGui::SetTooltip("(Shift+R)"); }
       if (regionState) { ImGui::PopStyleColor(); }
+
+      bool regionPicked = state.toolState == ToolStates_REGION_PICKED;
+      if (!regionPicked) { ImGui::PushStyleVar(ImGuiStyleVar_Alpha, 0.5f); }
       bool btnCrop = ImGui::Button(ICON_FA_CROP " Crop");
-      if (ImGui::IsItemHovered()) { ImGui::SetTooltip("(Shift+C)"); }
+      auto cropttipEnabled = "(Shift+C)";
+      auto cropttipDisabled = "Select region to crop";
+      if (ImGui::IsItemHovered()) { ImGui::SetTooltip(regionPicked ? cropttipEnabled : cropttipDisabled); }
+      if (!regionPicked) { ImGui::PopStyleVar(); }
+
       bool btnRedo = ImGui::Button(ICON_FA_REDO " Redo");
       if (ImGui::IsItemHovered()) { ImGui::SetTooltip("Ctrl+Y"); }
       ImGui::EndGroup();
@@ -371,15 +434,43 @@ static void _doToolbar(Window* wnd, BIMPState &state) {
       ImGui::Separator();
 
       float spd = state.ega ? 1.0f : 0.0f;
-      i32 size[2] = { 0 };
-      memcpy(size, &state.enteredSize, sizeof(i32) * 2);
-      ImGui::DragInt2("Size", size, spd, 0, MAX_IMG_DIM);
-      if (memcmp(size, &state.enteredSize, sizeof(i32) * 2)) {
-         if (state.pngTex) {
-            // change happened, resize
-            //memcpy(state.selectedSize, size, sizeof(int) * 2);
+
+      i32 sizeBuff[2] = { 0 };
+      if (state.pngTex) {
+         auto texSize = textureGetSize(state.pngTex);
+         memcpy(sizeBuff, &texSize, sizeof(i32) * 2);
+      }  
+      ImGui::AlignFirstTextHeightToWidgets();
+      ImGui::Text("Size: %d x %d", sizeBuff[0], sizeBuff[1]);
+      if (state.ega) {
+         ImGui::SameLine();
+         if (ImGui::Button("Resize")) {
+            ImGui::OpenPopup("Resize");
          }
-      }
+         if (ImGui::BeginPopupModal("Resize", 0, ImGuiWindowFlags_AlwaysAutoResize)) {
+            auto imStore = ImGui::GetStateStorage();
+            auto newX = imStore->GetIntRef(STORAGE_NEW_SIZE_X, 32);
+            auto newY = imStore->GetIntRef(STORAGE_NEW_SIZE_Y, 32);
+
+            i32 sizeBuff[2] = { *newX, *newY };
+            if (state.ega && ImGui::IsWindowAppearing()) {
+               auto egaSize = egaTextureGetSize(state.ega);
+               memcpy(sizeBuff, &egaSize, sizeof(i32) * 2);
+            }
+
+            ImGui::Dummy(ImVec2(200, 0));
+            if (ImGui::DragInt2("Size", sizeBuff, 1, 1, MAX_IMG_DIM)) {
+               *newX = sizeBuff[0];
+               *newY = sizeBuff[1];
+            }
+
+            if (ImGui::Button("Resize") || ImGui::IsKeyPressed(SDL_SCANCODE_RETURN)) {
+               _resize(state, *(Int2*)sizeBuff);
+               ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+         }
+      }      
 
       if (!state.ega) { ImGui::PopStyleVar(); }
 
@@ -387,20 +478,20 @@ static void _doToolbar(Window* wnd, BIMPState &state) {
 
       auto &io = ImGui::GetIO();
       if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) {
-         if (ImGui::IsKeyPressed(SDL_SCANCODE_X)) { btnSwapColors = true; }
-         if (ImGui::IsKeyPressed(SDL_SCANCODE_P)) { btnPencil = true; }
-         if (ImGui::IsKeyPressed(SDL_SCANCODE_F)) { btnFill = true; }
-         if (ImGui::IsKeyPressed(SDL_SCANCODE_E)) { btnErase = true; }
-         if (ImGui::IsKeyPressed(SDL_SCANCODE_C)) { btnColorPicker = true; }
-         if (ImGui::IsKeyPressed(SDL_SCANCODE_L)) { btnLines = true; }
-         if (ImGui::IsKeyPressed(SDL_SCANCODE_R)) { btnRect = true; }
-         if (ImGui::IsKeyPressed(SDL_SCANCODE_R) && io.KeyShift) { btnRegion = true; }
-         if (ImGui::IsKeyPressed(SDL_SCANCODE_C) && io.KeyShift) { btnCrop = true; }
-         if (ImGui::IsKeyPressed(SDL_SCANCODE_N) && io.KeyCtrl) { btnNew = true; }
-         if (ImGui::IsKeyPressed(SDL_SCANCODE_L) && io.KeyCtrl) { btnLoad = true; }
-         if (ImGui::IsKeyPressed(SDL_SCANCODE_S) && io.KeyCtrl) { btnSave = true; }
-         if (ImGui::IsKeyPressed(SDL_SCANCODE_Z) && io.KeyCtrl) { btnUndo = true; }
-         if (ImGui::IsKeyPressed(SDL_SCANCODE_Y) && io.KeyCtrl) { btnRedo = true; }
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_X))                 { btnSwapColors = true; }
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_P))                 { btnPencil = true; }
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_F))                 { btnFill = true; }
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_E))                 { btnErase = true; }
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_C) && !io.KeyShift) { btnColorPicker = true; }
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_L) && !io.KeyCtrl) { btnLines = true; }
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_R) && !io.KeyShift) { btnRect = true; }
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_R) &&  io.KeyShift) { btnRegion = true; }
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_C) &&  io.KeyShift) { btnCrop = true; }
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_N) &&  io.KeyCtrl) { btnNew = true; }
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_L) &&  io.KeyCtrl) { btnLoad = true; }
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_S) &&  io.KeyCtrl) { btnSave = true; }
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_Z) &&  io.KeyCtrl) { btnUndo = true; }
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_Y) &&  io.KeyCtrl) { btnRedo = true; }
 
       }
 
@@ -412,7 +503,7 @@ static void _doToolbar(Window* wnd, BIMPState &state) {
          if (btnLines) { _setTool(state, ToolStates_LINES); }
          if (btnRect) { _setTool(state, ToolStates_RECT); }
          if (btnRegion) { _setTool(state, ToolStates_REGION_PICK); }
-         if (btnCrop) { /*crop*/ }
+         if (btnCrop && regionPicked) { _cropToSnippet(state); }
          if (btnUndo) { _undo(state); }
          if (btnRedo) { _redo(state); }         
       }
@@ -422,13 +513,27 @@ static void _doToolbar(Window* wnd, BIMPState &state) {
          ImGui::OpenPopup("New Image Size");
       }
 
-      if (ImGui::BeginPopupModal("New Image Size")) {
+      if (ImGui::BeginPopupModal("New Image Size", 0, ImGuiWindowFlags_AlwaysAutoResize)) {
+         auto imStore = ImGui::GetStateStorage();
+         auto newX = imStore->GetIntRef(STORAGE_NEW_SIZE_X, 32);
+         auto newY = imStore->GetIntRef(STORAGE_NEW_SIZE_Y, 32);
+
+         i32 sizeBuff[2] = { *newX, *newY };
+         if (state.ega && ImGui::IsWindowAppearing()) {
+            auto egaSize = egaTextureGetSize(state.ega);
+            memcpy(sizeBuff, &egaSize, sizeof(i32) * 2);
+         }
+
          ImGui::Dummy(ImVec2(200, 0));
-         ImGui::DragInt2("Size", (i32*)&state.enteredSize, 1, 0, MAX_IMG_DIM);
+         if (ImGui::DragInt2("Size", sizeBuff, 1, 1, MAX_IMG_DIM)) {
+            *newX = sizeBuff[0];
+            *newY = sizeBuff[1];
+         }
+
          if (ImGui::Button("Create!") || ImGui::IsKeyPressed(SDL_SCANCODE_RETURN)) {
             _stateTexCleanup(state);
-            state.pngTex = textureCreateCustom(state.enteredSize.x, state.enteredSize.y, { RepeatType_CLAMP, FilterType_NEAREST });
-            state.ega = egaTextureCreate(state.enteredSize.x, state.enteredSize.y);
+            state.pngTex = textureCreateCustom(*newX, *newY, { RepeatType_CLAMP, FilterType_NEAREST });
+            state.ega = egaTextureCreate(*newX, *newY);
             _refreshEditTextures(state);
             egaClearAlpha(state.ega);
             _fitToWindow(state);
@@ -615,6 +720,7 @@ static void _doToolMousePressed(BIMPState &state, Int2 mouse) {
          _commitEditPlane(state);
          state.lastPointPlaced = mouse;
          _exitRegionPicked(state);
+         
       }
 
       break; }
@@ -668,13 +774,18 @@ static void _doToolMousePressed(BIMPState &state, Int2 mouse) {
    
 }
 
-static void _cutSnippet(BIMPState &state, Int2 mouse) {
+static bool _cutSnippet(BIMPState &state, Int2 mouse) {
    auto snippetRegion = _makeRect(state.lastPointPlaced, mouse);
+
+   if (snippetRegion.w == snippetRegion.h == 1) {
+      return false;
+   }
+
    if (state.snippet) {
       egaTextureDestroy(state.snippet);
    }
 
-   _saveSnapshot(state);
+   //_saveSnapshot(state);
 
    state.snippetPosition = { snippetRegion.x, snippetRegion.y };
    state.snippet = egaTextureCreate(snippetRegion.w, snippetRegion.h);
@@ -684,13 +795,16 @@ static void _cutSnippet(BIMPState &state, Int2 mouse) {
    egaRenderRect(state.ega, snippetRegion, EGA_ALPHA);
    egaClearAlpha(state.editEGA);
    egaRenderTexture(state.editEGA, state.snippetPosition, state.snippet);
+
+   return true;
 }
 
 static void _doToolMouseReleased(BIMPState &state, Int2 mouse) {
    switch (state.toolState) {
    case ToolStates_REGION_PICK:
-      _cutSnippet(state, mouse);
-      state.toolState = ToolStates_REGION_PICKED;
+      if (_cutSnippet(state, mouse)) {
+         state.toolState = ToolStates_REGION_PICKED;
+      }
       break;
    case ToolStates_LINES:
    case ToolStates_RECT:
@@ -845,15 +959,29 @@ static void _makeGuideRect(BIMPState &state, ImVec2 const &p, Float2 a_in, Float
 }
 
 static void _doCustomToolRender(BIMPState &state, ImDrawList *draw_list, ImVec2 const &p) {
-   if (!state.ega || !state.mouseInImage) {
+   if (!state.ega) {
       return;
    }
 
    auto &io = ImGui::GetIO();
    auto mouseScreenPos = io.MousePos;
-
    ImU32 guideCol = IM_COL32(32, 32, 32, 164);
 
+   // the region picked area we want to always show
+   if(state.toolState == ToolStates_REGION_PICKED) {
+      auto snippetSize = egaTextureGetSize(state.snippet);
+      ImVec2 a = _imageToScreen({ (f32)state.snippetPosition.x, (f32)state.snippetPosition.y }, state, p);
+      ImVec2 b = _imageToScreen({ (f32)state.snippetPosition.x + snippetSize.x, (f32)state.snippetPosition.y + snippetSize.y }, state, p);
+
+      draw_list->AddRectFilled(a, b, IM_COL32(255, 255, 255, 32));
+      draw_list->AddRect(a, b, guideCol, 1.0f, ImDrawCornerFlags_All, 1.5f);
+   }
+
+   if (!state.mouseInImage) {
+      return;
+   }
+
+   // the rest of thenguides only show if mouse in image
    auto a = _imageToScreen(Float2{ floorf(state.mousePos.x), floorf(state.mousePos.y) }, state, p);
    auto b = _imageToScreen(Float2{ floorf(state.mousePos.x + 1), floorf(state.mousePos.y + 1) }, state, p);
    draw_list->AddRect(a, b, guideCol, 1.0f, ImDrawCornerFlags_All, 1.5f);
@@ -871,14 +999,6 @@ static void _doCustomToolRender(BIMPState &state, ImDrawList *draw_list, ImVec2 
       }
 
       break; }
-   case ToolStates_REGION_PICKED: {
-      auto snippetSize = egaTextureGetSize(state.snippet);
-      ImVec2 a = _imageToScreen({ (f32)state.snippetPosition.x, (f32)state.snippetPosition.y }, state, p);
-      ImVec2 b = _imageToScreen({ (f32)state.snippetPosition.x + snippetSize.x, (f32)state.snippetPosition.y + snippetSize.y }, state, p);
-      
-      draw_list->AddRectFilled(a, b, IM_COL32(255, 255, 255, 32));
-      draw_list->AddRect(a, b, guideCol, 1.0f, ImDrawCornerFlags_All, 1.5f);
-      break;}
    case ToolStates_REGION_PICK:
    case ToolStates_RECT: {
       if (state.mouseDown) {

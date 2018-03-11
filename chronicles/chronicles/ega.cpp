@@ -532,13 +532,42 @@ void egaTextureResize(EGATexture *self, u32 width, u32 height) {
       return;
    }
 
-   _freeTextureBuffers(self);
+   // copy over to new size if you have anything
+   if (self->pixelData) {
+      auto copyWidth = MIN(width, self->w);
+      auto copyHeight = MIN(height, self->h);
+      auto newPixelCount = width * height;
 
-   self->w = width;
-   self->h = height;
-   self->pixelCount = self->w * self->h;
-   self->fullRegion = EGARegion{ 0, 0, (i32)self->w, (i32)self->h };
-   self->pixelData = new byte[self->pixelCount];
+      auto newPixelData = new byte[newPixelCount];
+      memset(newPixelData, EGA_ALPHA, newPixelCount);
+
+      byte *destSL = newPixelData;
+      byte *srcSL = self->pixelData;
+      for (int y = 0; y < copyHeight; ++y) {
+         memcpy(destSL, srcSL, copyWidth);
+         destSL += width;
+         srcSL += self->w;
+      }
+
+      self->w = width;
+      self->h = height;
+      self->pixelCount = newPixelCount;
+      delete[] self->pixelData;
+      self->pixelData = newPixelData;
+
+      if (self->decodePixels) {
+         delete[] self->decodePixels;
+         self->decodePixels = nullptr;
+      }
+   }
+   else {
+      self->w = width;
+      self->h = height;
+      self->pixelCount = self->w * self->h;
+      self->pixelData = new byte[self->pixelCount];
+   }
+   
+   self->fullRegion = EGARegion{ 0, 0, (i32)self->w, (i32)self->h };   
    self->dirty = Tex_ALL_DIRTY;
 }
 
