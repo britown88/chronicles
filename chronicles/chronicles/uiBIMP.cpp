@@ -196,6 +196,31 @@ static void _resize(BIMPState &state, Int2 newSize) {
    }
 }
 
+static void _fitToWindow(BIMPState &state) {
+   auto texSize = textureGetSize(state.pngTex);
+   float pxWidth = 1.0f;
+   float pxHeight = 1.0f;
+
+   if (state.egaStretch) {
+      pxWidth = EGA_PIXEL_WIDTH;
+      pxHeight = EGA_PIXEL_HEIGHT;
+   }
+
+   Float2 t = { texSize.x * pxWidth, texSize.y * pxHeight };
+
+   auto rect = getProportionallyFitRect(t, state.windowSize);
+
+   if (rect.w > rect.h) {
+      state.zoomLevel = rect.h / (float)texSize.y / pxHeight;
+   }
+   else {
+      state.zoomLevel = rect.w / (float)texSize.x / pxWidth;
+   }
+
+
+   state.zoomOffset = { 0,0 };
+}
+
 static void _cropToSnippet(BIMPState &state) {
    auto curSize = egaTextureGetSize(state.ega);
    auto snipSize = egaTextureGetSize(state.snippet);
@@ -208,6 +233,7 @@ static void _cropToSnippet(BIMPState &state) {
    egaRenderTexture(state.ega, { 0,0 }, state.snippet);
    _exitRegionPicked(state);
    _saveSnapshot(state);
+   _fitToWindow(state);
 }
 
 static std::string _genWinTitle(BIMPState *state) {
@@ -240,30 +266,7 @@ static std::string _getPng() {
    return openFile(cfg);
 }
 
-static void _fitToWindow(BIMPState &state) {
-   auto texSize = textureGetSize(state.pngTex);
-   float pxWidth = 1.0f;
-   float pxHeight = 1.0f;
 
-   if (state.egaStretch) {
-      pxWidth = EGA_PIXEL_WIDTH;
-      pxHeight = EGA_PIXEL_HEIGHT;
-   }
-
-   Float2 t = { texSize.x * pxWidth, texSize.y * pxHeight };
-
-   auto rect = getProportionallyFitRect(t, state.windowSize);
-
-   if (rect.w > rect.h) {
-      state.zoomLevel = rect.h / (float)texSize.y / pxHeight;
-   }
-   else {
-      state.zoomLevel = rect.w / (float)texSize.x / pxWidth;
-   }
-
-   
-   state.zoomOffset = {0,0};
-}
 
 static void _loadPNG(BIMPState &state) {
    auto png = _getPng();
@@ -478,6 +481,13 @@ static void _doToolbar(Window* wnd, BIMPState &state) {
 
       auto &io = ImGui::GetIO();
       if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)) {
+         if (ImGui::IsKeyPressed(SDL_SCANCODE_DELETE)) { 
+            if (regionPicked) {
+               _exitRegionPicked(state);
+               egaClearAlpha(state.editEGA);
+               _saveSnapshot(state);
+            } 
+         }
          if (ImGui::IsKeyPressed(SDL_SCANCODE_X))                 { btnSwapColors = true; }
          if (ImGui::IsKeyPressed(SDL_SCANCODE_P))                 { btnPencil = true; }
          if (ImGui::IsKeyPressed(SDL_SCANCODE_F))                 { btnFill = true; }
@@ -588,6 +598,7 @@ static void _doToolbar(Window* wnd, BIMPState &state) {
          EGAPalette resultPal = { 0 };
 
          if (auto decoded = egaTextureCreateFromTextureEncode(state.pngTex, &state.palette, &resultPal)) {
+            _exitRegionPicked(state);
             state.ega = decoded;
             state.palette = resultPal;
             _refreshEditTextures(state);
@@ -714,6 +725,11 @@ static void _doToolMousePressed(BIMPState &state, Int2 mouse) {
       if (mouse.x >= region.x && mouse.y >= region.y && 
          mouse.x < region.x + region.w && mouse.y < region.y + region.h) {
          state.lastPointPlaced = { mouse.x - region.x, mouse.y - region.y };
+
+         if (io.KeyShift) {
+            egaRenderTexture(state.ega, state.snippetPosition, state.snippet);
+            _saveSnapshot(state);
+         }
 
       }
       else {
