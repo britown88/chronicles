@@ -92,6 +92,7 @@ EGAFont *egaFontFactoryGetFont(EGAFontFactory *self, EGAColor bgColor, EGAColor 
 
 void egaClear(EGATexture *target, EGAPColor color, EGARegion *vp = nullptr);
 void egaClearAlpha(EGATexture *target);
+void egaColorReplace(EGATexture *target, EGAPColor oldCOlor, EGAPColor newColor);
 void egaRenderTexture(EGATexture *target, Int2 pos, EGATexture *tex, EGARegion *vp = nullptr);
 void egaRenderTexturePartial(EGATexture *target, Int2 pos, EGATexture *tex, Recti uv, EGARegion *vp = nullptr);
 void egaRenderPoint(EGATexture *target, Int2 pos, EGAPColor color, EGARegion *vp = nullptr);

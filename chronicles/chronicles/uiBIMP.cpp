@@ -394,7 +394,7 @@ static void _doToolbar(Window* wnd, BIMPState &state) {
       if (state.toolState == ToolStates_PENCIL) { ImGui::PopStyleColor(); }
       if (state.toolState == ToolStates_FLOODFILL) { ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive)); }
       bool btnFill = ImGui::Button(ICON_FA_PAINT_BRUSH " Flood Fill");
-      if (ImGui::IsItemHovered()) { ImGui::SetTooltip("(F)"); }
+      if (ImGui::IsItemHovered()) { ImGui::SetTooltip("(F) Shift for color replace"); }
       if (state.toolState == ToolStates_FLOODFILL) { ImGui::PopStyleColor(); }
       if (state.erase) { ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive)); }
       bool btnErase = ImGui::Button(ICON_FA_ERASER " Eraser");
@@ -769,7 +769,14 @@ static void _doToolMousePressed(BIMPState &state, Int2 mouse) {
 
    case ToolStates_FLOODFILL: {
       egaClearAlpha(state.editEGA);
-      _floodFill(state.ega, mouse, color);
+
+      if (io.KeyShift) {
+         egaColorReplace(state.ega, egaTextureGetColorAt(state.ega, mouse.x, mouse.y), color);
+      }
+      else {
+         _floodFill(state.ega, mouse, color);
+      }
+      
       state.mouseDown = false;
       _saveSnapshot(state);
       break; }

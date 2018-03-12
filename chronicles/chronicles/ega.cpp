@@ -651,6 +651,15 @@ static void _renderTextureEX(EGATexture *dest, EGATexture *src, Recti const& src
    dest->dirty = Tex_ALL_DIRTY;
 }
 
+void egaColorReplace(EGATexture *target, EGAPColor oldColor, EGAPColor newColor) {
+   for (u32 i = 0; i < target->pixelCount; ++i) {
+      if (target->pixelData[i] == oldColor) {
+         target->pixelData[i] = newColor;
+      }
+   }
+   target->dirty = Tex_ALL_DIRTY;
+}
+
 void egaRenderTexture(EGATexture *target, Int2 pos, EGATexture *tex, EGARegion *vp) {
    if (!vp) { vp = &target->fullRegion; }
 
