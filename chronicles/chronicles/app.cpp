@@ -42,9 +42,9 @@ struct App {
    Game* game;   
 };
 
-App* appCreate() {
+App* appCreate(AppConfig const& config) {
    auto out = new App();
-   out->game = gameCreate();
+   out->game = gameCreate(config.assetFolder);
    return out;
 }
 

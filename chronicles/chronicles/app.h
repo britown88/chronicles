@@ -13,9 +13,13 @@
 #define MOUSE_RIGHT 1
 #define MOUSE_MIDDLE 2
 
+struct AppConfig {
+   const char* assetFolder = nullptr;
+};
+
 // APP
 typedef struct App App;
-App* appCreate();
+App* appCreate(AppConfig const& config);
 
 typedef struct {
    u32 w, h;

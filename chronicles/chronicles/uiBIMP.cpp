@@ -1238,7 +1238,9 @@ void uiBimpStart( Window* wnd) {
    BIMPState *state = new BIMPState();
 
    strcpy(state->palName, "default");
-   paletteLoad(game->assets.palettes, state->palName, &state->palette);
+   if (auto pal = assetsPaletteRetrieve(game->assets, state->palName)) {
+      state->palette = *pal;
+   }
 
    state->winName = _genWinTitle(state);
 

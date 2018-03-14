@@ -627,7 +627,7 @@ void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSiz
          }
          ImGui::InputText(ICON_FA_SEARCH, search, 64);
 
-         auto pals = paletteList(game->assets.palettes, search);
+         auto pals = assetsPaletteGetList(game->assets, search);
          *loadCursor = MIN(*loadCursor, MAX(0, pals.size()-1));
 
          if (ImGui::BeginChild("List", ImVec2(ImGui::GetContentRegionAvailWidth(), ImGui::GetFrameHeightWithSpacing() * 5), true)) {
@@ -649,7 +649,7 @@ void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSiz
                   }
 
                   if (uiModalPopup("Delete Confirm", "Delete this palette?", uiModalTypes_YESNO, ICON_FA_EXCLAMATION_TRIANGLE) == uiModalResults_YES) {
-                     paletteDelete(game->assets.palettes, p.c_str());
+                     assetsPaletteDelete(game->assets, p.c_str());
                   }
 
                   if (palIdx == *loadCursor) {
@@ -660,10 +660,14 @@ void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSiz
                   ImGui::SameLine();
                   bool clicked = ImGui::Button(p.c_str(), ImVec2(ImGui::GetContentRegionAvailWidth(), 0));
                   if (ImGui::IsItemHovered()) {
-                     paletteLoad(game->assets.palettes, p.c_str(), pal);
+                     if (auto apal = assetsPaletteRetrieve(game->assets, p.c_str())) {
+                        *pal = *apal;
+                     }                     
                   }
                   if (clicked) {
-                     paletteLoad(game->assets.palettes, p.c_str(), pal);
+                     if (auto apal = assetsPaletteRetrieve(game->assets, p.c_str())) {
+                        *pal = *apal;
+                     }
                      strcpy(palName, p.c_str());
                      ImGui::CloseCurrentPopup();
                   }
@@ -679,7 +683,9 @@ void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSiz
 
                if (ImGui::IsKeyPressed(SDL_SCANCODE_RETURN)) {
                   auto &p = pals[*loadCursor];
-                  paletteLoad(game->assets.palettes, p.c_str(), pal);
+                  if (auto apal = assetsPaletteRetrieve(game->assets, p.c_str())) {
+                     *pal = *apal;
+                  }
                   strcpy(palName, p.c_str());
                   ImGui::CloseCurrentPopup();
                }
@@ -704,7 +710,9 @@ void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSiz
       else {
          if (*loadOpened) {
             *loadOpened = false;
-            paletteLoad(game->assets.palettes, palName, pal);
+            if (auto apal = assetsPaletteRetrieve(game->assets, palName)) {
+               *pal = *apal;
+            }
          }
       }
 
@@ -718,7 +726,7 @@ void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSiz
          ImGui::PushStyleVar(ImGuiStyleVar_Alpha, ImGui::GetStyle().Alpha*0.5f);
       }
 
-      bool palExists = paletteExists(game->assets.palettes, palName);
+      bool palExists = assetsPaletteRetrieve(game->assets, palName) != nullptr;
       auto btnSave = ImGui::Button(ICON_FA_DOWNLOAD);
 
       static StringView ttip_save = "Save";
@@ -730,12 +738,12 @@ void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSiz
             ImGui::OpenPopup("Save Confirm");
          }
          else {
-            paletteSave(game->assets.palettes, palName, pal);
+            assetsPaletteStore(game->assets, palName, pal);
             ImGui::OpenPopup("Saved");
          }
       }
       if (uiModalPopup("Save Confirm", "Palette Exists\nOverwrite?", uiModalTypes_YESNO, ICON_FA_EXCLAMATION) == uiModalResults_YES) {
-         paletteSave(game->assets.palettes, palName, pal);
+         assetsPaletteStore(game->assets, palName, pal);
          ImGui::OpenPopup("Saved");
       }
       uiModalPopup("Saved", "Palette Saved!", uiModalTypes_OK, ICON_FA_CHECK);
@@ -756,7 +764,9 @@ void uiPaletteEditor(Window* wnd, EGAPalette* pal, char* palName, u32 palNameSiz
       static StringView ttip_refreshinvalid = "Refresh (palette not found)";
       if (ImGui::IsItemHovered()) ImGui::SetTooltip(palExists ? ttip_refresh : ttip_refreshinvalid);
       if (btnRefresh && palExists) {
-         paletteLoad(game->assets.palettes, palName, pal);
+         if (auto apal = assetsPaletteRetrieve(game->assets, palName)) {
+            *pal = *apal;
+         }
       }
 
       if (!palExists) {

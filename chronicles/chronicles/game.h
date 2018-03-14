@@ -9,7 +9,7 @@
 typedef struct Texture Texture;
 typedef struct EGATexture EGATexture;
 
-typedef struct PaletteManager PaletteManager;
+typedef struct Assets Assets;
 
 struct GameData {
    struct {
@@ -24,15 +24,13 @@ struct GameData {
 
    } primaryView;
 
-   struct {
-      PaletteManager *palettes;
-   } assets;
+   Assets *assets = nullptr;
 };
 
 GameData* gameGet();
 
 typedef struct Game Game;
-Game* gameCreate();
+Game* gameCreate(StringView assetsFolder);
 GameData* gameData(Game* game);
 
 typedef struct Window Window;
@@ -41,11 +39,10 @@ void gameUpdate(Game* game, Window* wnd);
 void gameDestroy(Game* game);
 void gameDoUI(Window* wnd);
 
-bool paletteExists(PaletteManager* manager, StringView name);
-void paletteSave(PaletteManager* manager, StringView name, EGAPalette *pal);
-void paletteLoad(PaletteManager* manager, StringView name, EGAPalette *pal);
-void paletteDelete(PaletteManager* manager, StringView pal);
+void        assetsPaletteStore(Assets *assets, StringView name, EGAPalette *pal);
+void        assetsPaletteDelete(Assets *assets, StringView name);
+EGAPalette *assetsPaletteRetrieve(Assets *assets, StringView name);
+std::vector<std::string> assetsPaletteGetList(Assets *assets, StringView search = nullptr);
 
-std::vector<std::string> paletteList(PaletteManager* manager, StringView search = nullptr);
 
 

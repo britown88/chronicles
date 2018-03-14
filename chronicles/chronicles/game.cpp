@@ -13,19 +13,33 @@ struct Game {
    GameData data;
 };
 
+struct Assets {
+   StringView assetsFolder = nullptr;
+
+   std::unordered_map<std::string, EGAPalette*> palettes;
+};
+
+static void _assetsDestroy(Assets* assets) {
+   for (auto &p : assets->palettes) {
+      delete p.second;
+   }
+
+   delete assets;
+}
 
 static GameData* g_gameData = nullptr;
 GameData* gameGet() {
    return g_gameData;
 }
 
-struct PaletteManager {
-   std::unordered_map<std::string, EGAPalette> palettes;
-};
 
-static void _loadPalettes(PaletteManager *manager) {
+static std::string _assetPath(Assets *assets, StringView path) {
+   return assets->assetsFolder ? format("%s/%s", assets->assetsFolder, path) : path;
+}
+
+static void _loadPalettes(Assets *assets) {
    u64 bSize = 0;
-   auto buff = readFullFile(PalettePath, &bSize);
+   auto buff = readFullFile(_assetPath(assets, PalettePath).c_str(), &bSize);
 
    if (buff) {
       auto view = scfView(buff);
@@ -53,7 +67,14 @@ static void _loadPalettes(PaletteManager *manager) {
                   return;
                }
 
-               manager->palettes[key] = value;
+               if (auto existing = assetsPaletteRetrieve(assets, key.c_str())) {
+                  *existing = value;
+               }
+               else {
+                  EGAPalette *newPal = new EGAPalette;
+                  *newPal = value;
+                  assets->palettes.insert({ key, newPal });
+               }
             }
             else {
                return;
@@ -63,10 +84,10 @@ static void _loadPalettes(PaletteManager *manager) {
    }
 }
 
-static void _savePalettes(PaletteManager* manager) {
+static void _savePalettes(Assets* assets) {
    auto writer = scfWriterCreate();
 
-   for (auto &p : manager->palettes) {
+   for (auto &p : assets->palettes) {
       scfWriteListBegin(writer);
       scfWriteString(writer, p.first.c_str());
       scfWriteBytes(writer, (byte*)&p.second, sizeof(EGAPalette));
@@ -75,33 +96,40 @@ static void _savePalettes(PaletteManager* manager) {
 
    u32 bSize = 0;
    auto out = scfWriteToBuffer(writer, &bSize);
-   writeBinaryFile(PalettePath, (byte*)out, bSize);
+   writeBinaryFile(_assetPath(assets, PalettePath).c_str(), (byte*)out, bSize);
    delete[] out;
 }
 
-bool paletteExists(PaletteManager* manager, StringView name) {
-   return manager->palettes.find(name) != manager->palettes.end();
-}
-
-void paletteSave(PaletteManager* manager, StringView name, EGAPalette *pal) {
-   manager->palettes[name] = *pal;
-   _savePalettes(manager);
-}
-void paletteDelete(PaletteManager* manager, StringView pal) {
-   manager->palettes.erase(pal);
-   _savePalettes(manager);
-}
-void paletteLoad(PaletteManager* manager, StringView name, EGAPalette *pal) {
-   auto found = manager->palettes.find(name);
-   if (found != manager->palettes.end()) {
-      *pal = found->second;
+void assetsPaletteStore(Assets *assets, StringView name, EGAPalette *pal) {
+   if (auto existing = assetsPaletteRetrieve(assets, name)) {
+      *existing = *pal;
    }
+   else {
+      EGAPalette *newPal = new EGAPalette;
+      *newPal = *pal;
+      assets->palettes.insert({ name, newPal });
+   }
+   _savePalettes(assets);
 }
-std::vector<std::string> paletteList(PaletteManager* manager, StringView search) {
+void assetsPaletteDelete(Assets *assets, StringView name) {
+   if (auto existing = assetsPaletteRetrieve(assets, name)) {
+      delete existing;
+      assets->palettes.erase(name);
+   }
+   
+   _savePalettes(assets);
+}
+EGAPalette *assetsPaletteRetrieve(Assets *assets, StringView name) {
+   auto found = assets->palettes.find(name);
+   if (found != assets->palettes.end()) {
+      return found->second;
+   }
+   return nullptr;
+}
+std::vector<std::string> assetsPaletteGetList(Assets *assets, StringView search) {
    std::vector<std::string> out;
    auto searchlen = strlen(search);
-   for (auto &p : manager->palettes) {
-
+   for (auto p : assets->palettes) {
       if (searchlen == 0 || p.first.find(search) != std::string::npos) {
          out.push_back(p.first);
       }
@@ -109,8 +137,11 @@ std::vector<std::string> paletteList(PaletteManager* manager, StringView search)
    return out;
 }
 
-static void _gameDataInit(GameData* game) {
+static void _gameDataInit(GameData* game, StringView assetsFolder) {
    egaStartup();
+
+   game->assets = new Assets();
+   game->assets->assetsFolder = assetsFolder;
 
    game->primaryView.palette = { 1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16 };
    game->primaryView.egaTexture = egaTextureCreate(EGA_RES_WIDTH, EGA_RES_HEIGHT);
@@ -118,15 +149,14 @@ static void _gameDataInit(GameData* game) {
 
    egaClear(game->primaryView.egaTexture, 0);
 
-   game->assets.palettes = new PaletteManager();
-   _loadPalettes(game->assets.palettes);
+   _loadPalettes(game->assets);
    
 }
 
 
-Game* gameCreate() {
+Game* gameCreate(StringView assetsFolder) {
    auto out = new Game();
-   _gameDataInit(&out->data);
+   _gameDataInit(&out->data, assetsFolder);
    g_gameData = &out->data;
    return out;
 }
@@ -155,8 +185,7 @@ void gameDestroy(Game* game) {
 
    egaTextureDestroy(game->data.primaryView.egaTexture);
 
-   _savePalettes(game->data.assets.palettes);
-   delete game->data.assets.palettes;
+   _assetsDestroy(game->data.assets);
 
    delete game;
 }
