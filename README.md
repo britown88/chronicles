@@ -1,2 +1,2 @@
 # chronicles
-One started attempt to restart chronicles ina  new engine
+One attempt to restart chronicles in a new engine. Featuring ImGui and a cool image editor for EGA graphics
